@@ -4,10 +4,10 @@ import { supabase } from '../lib/supabase';
 import { useAppData } from '../context/AppData';
 
 export function useAutoSimpleFINSync() {
-  const [sfAccessUrl]  = useLocalStorage('lfjh_simplefin_url', '');
+  const { settings, setTransactionsRaw } = useAppData();
+  const sfAccessUrl = settings?.simplefin_url || '';
   const [lastSyncDate, setLastSyncDate] = useLocalStorage('lfjh_auto_sync_date', '');
   const [status, setStatus] = useState(null);
-  const { setTransactionsRaw } = useAppData();
 
   useEffect(() => {
     if (!sfAccessUrl) return;
@@ -58,7 +58,6 @@ export function useAutoSimpleFINSync() {
         })
       );
 
-      // Fetch existing sfTxIds and date+amount combos from Supabase for dedup
       const { data: existing } = await supabase
         .from('transactions')
         .select('sf_tx_id, date, amount')
@@ -74,7 +73,6 @@ export function useAutoSimpleFINSync() {
 
       if (fresh.length > 0) {
         await supabase.from('transactions').insert(fresh);
-        // Update local state by appending mapped transactions
         const mapped = fresh.map(t => ({
           id: t.id, sfTxId: t.sf_tx_id || '',
           date: t.date, description: t.description,

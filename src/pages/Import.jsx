@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Upload, Check, AlertCircle, RefreshCw, Landmark } from 'lucide-react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { TRANSACTION_CATEGORIES } from '../data/sampleData';
@@ -57,7 +57,7 @@ function guessField(row, candidates) {
 const fmt = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function Import() {
-  const { transactions, bulkAddTransactions, updateTransaction, deleteTransaction, properties } = useAppData();
+  const { transactions, bulkAddTransactions, updateTransaction, deleteTransaction, properties, settings, saveSetting } = useAppData();
   const [mode, setMode] = useState('bank');
 
   // ── CSV state ──────────────────────────────────────────────────────────────
@@ -174,8 +174,10 @@ export default function Import() {
   };
 
   // ── SimpleFIN state ────────────────────────────────────────────────────────
-  const [sfAccessUrl, setSfAccessUrl] = useLocalStorage('lfjh_simplefin_url', '');
-  const [sfStep, setSfStep] = useState(() => sfAccessUrl ? 'sync' : 'connect');
+  const sfAccessUrl = settings?.simplefin_url || '';
+  const setSfAccessUrl = (url) => saveSetting('simplefin_url', url);
+  const [sfStep, setSfStep] = useState('connect');
+  useEffect(() => { if (sfAccessUrl) setSfStep(s => s === 'connect' ? 'sync' : s); }, [sfAccessUrl]);
   const [sfToken, setSfToken] = useState('');
   const [sfConnecting, setSfConnecting] = useState(false);
   const [sfSyncing, setSfSyncing] = useState(false);
@@ -261,8 +263,8 @@ export default function Import() {
     setSfStep('done');
   }
 
-  function sfDisconnect() {
-    setSfAccessUrl('');
+  async function sfDisconnect() {
+    await setSfAccessUrl('');
     setSfStep('connect');
     setSfAccounts([]);
     setSfPreview([]);
@@ -271,7 +273,7 @@ export default function Import() {
   }
 
   return (
-    <div className="p-8 max-w-3xl">
+    <div className="p-4 md:p-8 max-w-3xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Import Transactions</h1>
         <p className="text-slate-400 text-sm mt-1">Sync from your bank or upload a CSV file</p>

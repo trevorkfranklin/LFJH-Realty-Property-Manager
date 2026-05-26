@@ -18,6 +18,7 @@ export function AppDataProvider({ children }) {
   const [owners,       setOwners]       = useState([]);
   const [propertyTaxes,setPropertyTaxes]= useState([]);
   const [hoaDues,      setHoaDues]      = useState([]);
+  const [settings,     setSettings]     = useState({});
   const [loading,      setLoading]      = useState(true);
 
   const fetchAll = useCallback(() => {
@@ -29,18 +30,29 @@ export function AppDataProvider({ children }) {
       supabase.from('owners').select('*').order('last_name'),
       supabase.from('property_taxes').select('*').order('tax_year', { ascending: false }),
       supabase.from('hoa_dues').select('*').order('year', { ascending: false }),
-    ]).then(([p, t, tx, o, pt, hoa]) => {
+      supabase.from('settings').select('*'),
+    ]).then(([p, t, tx, o, pt, hoa, s]) => {
       setProperties((p.data   || []).map(propertyFromDB));
       setTenants(   (t.data   || []).map(tenantFromDB));
       setTransactions((tx.data|| []).map(txFromDB));
       setOwners(    (o.data   || []).map(ownerFromDB));
       setPropertyTaxes((pt.data||[]).map(taxFromDB));
       setHoaDues(   (hoa.data || []).map(hoaFromDB));
+      const settingsMap = {};
+      (s.data || []).forEach(r => { settingsMap[r.key] = r.value; });
+      setSettings(settingsMap);
       setLoading(false);
     });
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // ── Settings ────────────────────────────────────────────────────────────────
+  const saveSetting = useCallback(async (key, value) => {
+    const { error } = await supabase.from('settings').upsert({ key, value }, { onConflict: 'key' });
+    if (!error) setSettings(prev => ({ ...prev, [key]: value }));
+    return { error };
+  }, []);
 
   // ── Properties ──────────────────────────────────────────────────────────────
   const addProperty = useCallback(async (p) => {
@@ -170,7 +182,7 @@ export function AppDataProvider({ children }) {
 
   return (
     <AppDataContext.Provider value={{
-      properties, tenants, transactions, owners, propertyTaxes, hoaDues, loading, reload: fetchAll,
+      properties, tenants, transactions, owners, propertyTaxes, hoaDues, settings, saveSetting, loading, reload: fetchAll,
       addProperty, updateProperty, deleteProperty,
       addTenant, updateTenant, deleteTenant,
       addTransaction, updateTransaction, deleteTransaction, bulkAddTransactions, setTransactionsRaw,
