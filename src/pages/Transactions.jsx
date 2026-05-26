@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Plus, Pencil, Trash2, X, Check, Ban, Split, Download } from 'lucide-react';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { sampleTransactions, sampleProperties, sampleOwners, TRANSACTION_CATEGORIES } from '../data/sampleData';
+import { useAppData } from '../context/AppData';
+import { TRANSACTION_CATEGORIES } from '../data/sampleData';
 import { buildPatternMap, suggest, isUncategorized } from '../utils/categorizer';
 import { sortByStreetName } from '../utils/sort';
 import { usePropertyFilter } from '../context/PropertyFilter';
@@ -236,9 +236,7 @@ function SplitModal({ title, form, setForm, onSave, onClose, properties, owners 
 }
 
 export default function Transactions() {
-  const [transactions, setTransactions] = useLocalStorage('lfjh_transactions', sampleTransactions);
-  const [properties] = useLocalStorage('lfjh_properties', sampleProperties);
-  const [owners] = useLocalStorage('lfjh_owners', sampleOwners);
+  const { transactions, addTransaction, updateTransaction, deleteTransaction, properties, owners } = useAppData();
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState(EMPTY);
   const { filterProperty } = usePropertyFilter();
@@ -309,7 +307,10 @@ export default function Transactions() {
     return { income, expenses, ownerDraw, net: income - expenses };
   }, [transactions, filterProperty, filterMonth, filterCategory]);
 
-  const toggleExclude = (id) => setTransactions(prev => prev.map(t => t.id === id ? { ...t, excluded: !t.excluded } : t));
+  const toggleExclude = (id) => {
+    const tx = transactions.find(t => t.id === id);
+    if (tx) updateTransaction({ ...tx, excluded: !tx.excluded });
+  };
 
   const patternMap = useMemo(() => buildPatternMap(transactions), [transactions]);
 
@@ -318,9 +319,7 @@ export default function Transactions() {
     if (!tx) return;
     const hit = suggest(tx.description, patternMap);
     if (!hit) return;
-    setTransactions(prev => prev.map(t =>
-      t.id === id ? { ...t, category: hit.category, propertyId: hit.propertyId || t.propertyId, categorized: true } : t
-    ));
+    updateTransaction({ ...tx, category: hit.category, propertyId: hit.propertyId || tx.propertyId, categorized: true });
   };
 
   const openAdd = () => { setForm({ ...EMPTY, id: crypto.randomUUID() }); setModal('add'); };
@@ -328,11 +327,11 @@ export default function Transactions() {
   const save = () => {
     if (!form.description || !form.amount) return;
     const record = { ...form, amount: Number(form.amount), categorized: !!form.category };
-    if (modal === 'add') setTransactions(prev => [...prev, record]);
-    else setTransactions(prev => prev.map(t => t.id === record.id ? record : t));
+    if (modal === 'add') addTransaction(record);
+    else updateTransaction(record);
     setModal(null);
   };
-  const remove = (id) => { if (confirm('Delete this transaction?')) setTransactions(prev => prev.filter(t => t.id !== id)); };
+  const remove = (id) => { if (confirm('Delete this transaction?')) deleteTransaction(id); };
 
   const exportCSV = () => {
     const esc = (v) => { const s = String(v ?? ''); return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };

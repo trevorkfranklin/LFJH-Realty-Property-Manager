@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, Users, TrendingUp, TrendingDown, DollarSign, ArrowUpRight } from 'lucide-react';
+import { useAppData } from '../context/AppData';
 import { useLocalStorage } from '../hooks/useLocalStorage';
-import { sampleProperties, sampleTenants, sampleTransactions, samplePropertyTaxes } from '../data/sampleData';
-import { sampleHOADues } from '../data/sampleData';
 import { txInMonth, amountForMonth, amountForPropertyMonth } from '../utils/transactions';
 import { sortByStreetName } from '../utils/sort';
 import { usePropertyFilter } from '../context/PropertyFilter';
@@ -33,10 +32,7 @@ function StatCard({ icon: Icon, label, value, sub, color = 'emerald' }) {
 }
 
 export default function Dashboard() {
-  const [properties]    = useLocalStorage('lfjh_properties', sampleProperties);
-  const [tenants]       = useLocalStorage('lfjh_tenants', sampleTenants);
-  const [transactions]  = useLocalStorage('lfjh_transactions', sampleTransactions);
-  const [propertyTaxes] = useLocalStorage('lfjh_property_taxes', samplePropertyTaxes);
+  const { properties, tenants, transactions, propertyTaxes } = useAppData();
   const [rentcastData]  = useLocalStorage('lfjh_rentcast', {});
   const [sfAccounts]    = useLocalStorage('lfjh_simplefin_accounts', {});
 

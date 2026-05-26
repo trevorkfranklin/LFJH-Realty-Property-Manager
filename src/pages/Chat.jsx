@@ -1,10 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Send, Bot, User, Trash2, ChevronDown } from 'lucide-react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
-import {
-  sampleProperties, sampleTenants, sampleTransactions,
-  samplePropertyTaxes, sampleHOADues,
-} from '../data/sampleData';
+import { useAppData } from '../context/AppData';
 import { sortByStreetName } from '../utils/sort';
 
 const FREE_MODELS = [
@@ -135,11 +132,7 @@ ${hoaLines || '  None'}`;
 }
 
 export default function Chat() {
-  const [properties]   = useLocalStorage('lfjh_properties',       sampleProperties);
-  const [tenants]      = useLocalStorage('lfjh_tenants',           sampleTenants);
-  const [transactions] = useLocalStorage('lfjh_transactions',      sampleTransactions);
-  const [taxes]        = useLocalStorage('lfjh_property_taxes',    samplePropertyTaxes);
-  const [hoa]          = useLocalStorage('lfjh_hoa_dues',          sampleHOADues);
+  const { properties, tenants, transactions, propertyTaxes: taxes, hoaDues: hoa } = useAppData();
   const [rentcastData] = useLocalStorage('lfjh_rentcast',          {});
   const [sfAccounts]   = useLocalStorage('lfjh_simplefin_accounts',{});
 

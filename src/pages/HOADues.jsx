@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Plus, Pencil, Trash2, X, Check, ChevronRight, ChevronDown } from 'lucide-react';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { sampleHOADues, sampleProperties, sampleTransactions } from '../data/sampleData';
+import { useAppData } from '../context/AppData';
 import { usePropertyFilter } from '../context/PropertyFilter';
 import { useAuth } from '../context/Auth';
 import { sortByStreetName } from '../utils/sort';
@@ -52,9 +51,7 @@ function Modal({ title, form, setForm, onSave, onClose, properties }) {
 }
 
 export default function HOADues() {
-  const [hoaRecords, setHoaRecords] = useLocalStorage('lfjh_hoa_dues', sampleHOADues);
-  const [transactions] = useLocalStorage('lfjh_transactions', sampleTransactions);
-  const [properties]   = useLocalStorage('lfjh_properties', sampleProperties);
+  const { hoaDues: hoaRecords, addHoaDue, updateHoaDue, deleteHoaDue, transactions, properties } = useAppData();
   const [modal, setModal]           = useState(null);
   const [form, setForm]             = useState(EMPTY);
   const { filterProperty }          = usePropertyFilter();
@@ -167,10 +164,8 @@ export default function HOADues() {
     }
 
     if (!toAdd.length) return;
-    setHoaRecords(prev => {
-      const fresh = toAdd.filter(r => !prev.some(p => p.propertyId === r.propertyId && p.year === r.year));
-      return fresh.length ? [...prev, ...fresh] : prev;
-    });
+    const fresh = toAdd.filter(r => !hoaRecords.some(p => p.propertyId === r.propertyId && p.year === r.year));
+    for (const r of fresh) addHoaDue(r);
   }, [entries]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const years = useMemo(() => [...new Set(entries.map(e => e.year))].sort((a, b) => a - b), [entries]);
@@ -195,12 +190,12 @@ export default function HOADues() {
   const save = () => {
     if (!form.propertyId || !form.year) return;
     const record = { ...form, annualAmount: Number(form.annualAmount) || 0 };
-    if (modal === 'add') setHoaRecords(prev => [...prev, record]);
-    else setHoaRecords(prev => prev.map(r => r.id === record.id ? record : r));
+    if (modal === 'add') addHoaDue(record);
+    else updateHoaDue(record);
     setModal(null);
   };
   const remove = (id) => {
-    if (confirm('Delete this HOA record?')) setHoaRecords(prev => prev.filter(r => r.id !== id));
+    if (confirm('Delete this HOA record?')) deleteHoaDue(id);
   };
 
   const statusBadge = (status) => {

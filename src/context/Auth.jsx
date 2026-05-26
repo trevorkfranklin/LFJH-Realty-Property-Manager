@@ -1,100 +1,107 @@
-import { createContext, useContext, useState, useCallback } from 'react';
-import { useLocalStorage } from '../hooks/useLocalStorage';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext(null);
 
-async function hashPwd(pwd) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwd));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
+// Secondary client with no session persistence — used for admin user creation
+// so creating a new user doesn't sign out the currently logged-in admin.
+const ephemeral = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY,
+  { auth: { persistSession: false, autoRefreshToken: false } }
+);
 
 export function AuthProvider({ children }) {
-  const [users, setUsers]       = useLocalStorage('lfjh_users', []);
-  const [auditLog, setAuditLog] = useLocalStorage('lfjh_audit_log', []);
-  const [session, setSession]   = useState(() => {
-    try { return JSON.parse(sessionStorage.getItem('lfjh_session')); }
-    catch { return null; }
-  });
+  const [session, setSession]   = useState(undefined); // undefined = loading
+  const [profile, setProfile]   = useState(null);
+  const [profiles, setProfiles] = useState([]);
+  const [needsSetup, setNeedsSetup] = useState(false);
 
-  const addAudit = useCallback((userId, username, action, details = '') => {
-    setAuditLog(prev => [{
-      id: crypto.randomUUID(),
-      timestamp: new Date().toISOString(),
-      userId, username, action, details,
-    }, ...prev].slice(0, 2000));
-  }, [setAuditLog]);
+  const loadProfiles = useCallback(async () => {
+    const { data } = await supabase.from('profiles').select('*').order('created_at');
+    setProfiles(data || []);
+  }, []);
 
-  const login = useCallback(async (username, password) => {
-    const hash = await hashPwd(password);
-    const user = users.find(u =>
-      u.username.toLowerCase() === username.toLowerCase() && u.passwordHash === hash
-    );
-    if (!user) {
-      addAudit('unknown', username, 'login_failed', 'Invalid credentials');
-      return { error: 'Invalid username or password' };
-    }
-    const sess = { userId: user.id, username: user.username, role: user.role, loginTime: new Date().toISOString() };
-    sessionStorage.setItem('lfjh_session', JSON.stringify(sess));
-    setSession(sess);
-    setUsers(prev => prev.map(u => u.id === user.id ? { ...u, lastLogin: new Date().toISOString() } : u));
-    addAudit(user.id, user.username, 'login');
+  const loadProfile = useCallback(async (userId) => {
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    setProfile(data);
+    loadProfiles();
+  }, [loadProfiles]);
+
+  useEffect(() => {
+    supabase.rpc('has_users').then(({ data }) => {
+      if (data === false) setNeedsSetup(true);
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session ?? null);
+      if (session) loadProfile(session.user.id);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) loadProfile(session.user.id);
+      else { setProfile(null); setProfiles([]); }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [loadProfile]);
+
+  const login = useCallback(async (email, password) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error: error.message };
+    setNeedsSetup(false);
     return { success: true };
-  }, [users, setUsers, addAudit]);
+  }, []);
 
-  const logout = useCallback(() => {
-    if (session) addAudit(session.userId, session.username, 'logout');
-    sessionStorage.removeItem('lfjh_session');
-    setSession(null);
-  }, [session, addAudit]);
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
+  }, []);
 
-  const createUser = useCallback(async (username, password, role, email = '') => {
-    if (users.find(u => u.username.toLowerCase() === username.toLowerCase()))
-      return { error: 'Username already exists' };
-    const hash = await hashPwd(password);
-    const user = {
-      id: crypto.randomUUID(), username, passwordHash: hash, role, email,
-      createdAt: new Date().toISOString(), lastLogin: null,
-    };
-    setUsers(prev => [...prev, user]);
-    if (session) addAudit(session.userId, session.username, 'create_user', `${username} (${role})`);
+  // First-time setup: create admin account and sign in
+  const createFirstAdmin = useCallback(async (email, password) => {
+    const { error } = await supabase.auth.signUp({
+      email, password,
+      options: { data: { role: 'admin' } },
+    });
+    if (error) return { error: error.message };
+    const { error: loginErr } = await supabase.auth.signInWithPassword({ email, password });
+    if (loginErr) return { error: loginErr.message };
+    setNeedsSetup(false);
     return { success: true };
-  }, [users, setUsers, session, addAudit]);
+  }, []);
 
-  const updateRole = useCallback((userId, role) => {
-    const target = users.find(u => u.id === userId);
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u));
-    if (session) addAudit(session.userId, session.username, 'update_role', `${target?.username} → ${role}`);
-  }, [users, setUsers, session, addAudit]);
+  // Admin creates additional users — uses ephemeral client so admin stays signed in
+  const createUser = useCallback(async (email, password, role) => {
+    const { error } = await ephemeral.auth.signUp({
+      email, password,
+      options: { data: { role } },
+    });
+    if (error) return { error: error.message };
+    // Refresh profiles list after a short delay (trigger needs a moment)
+    setTimeout(() => loadProfiles(), 1500);
+    return { success: true };
+  }, [loadProfiles]);
 
-  const updateEmail = useCallback((userId, email) => {
-    const target = users.find(u => u.id === userId);
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, email } : u));
-    if (session) addAudit(session.userId, session.username, 'update_email', `For: ${target?.username}`);
-  }, [users, setUsers, session, addAudit]);
+  const updateRole = useCallback(async (userId, role) => {
+    await supabase.from('profiles').update({ role }).eq('id', userId);
+    setProfiles(prev => prev.map(p => p.id === userId ? { ...p, role } : p));
+  }, []);
 
-  const changePassword = useCallback(async (userId, newPassword) => {
-    const hash = await hashPwd(newPassword);
-    const target = users.find(u => u.id === userId);
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, passwordHash: hash } : u));
-    if (session) addAudit(session.userId, session.username, 'change_password', `For: ${target?.username}`);
-  }, [users, setUsers, session, addAudit]);
+  const deleteUser = useCallback(async (userId) => {
+    await supabase.from('profiles').delete().eq('id', userId);
+    setProfiles(prev => prev.filter(p => p.id !== userId));
+  }, []);
 
-  const deleteUser = useCallback((userId) => {
-    const target = users.find(u => u.id === userId);
-    setUsers(prev => prev.filter(u => u.id !== userId));
-    if (session) addAudit(session.userId, session.username, 'delete_user', target?.username);
-  }, [users, setUsers, session, addAudit]);
-
-  const isAdmin  = session?.role === 'admin';
-  const canEdit  = isAdmin;
-  const needsSetup = users.length === 0;
+  const isAdmin = profile?.role === 'admin';
+  const canEdit = isAdmin;
 
   return (
     <AuthContext.Provider value={{
-      session, users, auditLog, needsSetup,
+      session, profile, profiles, needsSetup,
       isAdmin, canEdit,
-      login, logout,
-      createUser, updateRole, updateEmail, changePassword, deleteUser,
+      login, logout, createFirstAdmin, createUser, updateRole, deleteUser,
     }}>
       {children}
     </AuthContext.Provider>

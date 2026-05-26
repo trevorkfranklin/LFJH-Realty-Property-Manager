@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Plus, Pencil, Trash2, X, Check, ChevronRight, ChevronDown } from 'lucide-react';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { samplePropertyTaxes, sampleProperties, sampleTransactions } from '../data/sampleData';
+import { useAppData } from '../context/AppData';
 import { usePropertyFilter } from '../context/PropertyFilter';
 import { useAuth } from '../context/Auth';
 import { sortByStreetName } from '../utils/sort';
@@ -60,9 +59,7 @@ function Modal({ title, form, setForm, onSave, onClose, properties }) {
 }
 
 export default function PropertyTaxes() {
-  const [taxRecords, setTaxRecords] = useLocalStorage('lfjh_property_taxes', samplePropertyTaxes);
-  const [transactions] = useLocalStorage('lfjh_transactions', sampleTransactions);
-  const [properties] = useLocalStorage('lfjh_properties', sampleProperties);
+  const { propertyTaxes: taxRecords, addPropertyTax, updatePropertyTax, deletePropertyTax, transactions, properties } = useAppData();
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState(EMPTY);
   const { filterProperty } = usePropertyFilter();
@@ -203,12 +200,10 @@ export default function PropertyTaxes() {
 
     if (!toAdd.length) return;
 
-    setTaxRecords(prev => {
-      const fresh = toAdd.filter(r => !prev.some(p =>
-        p.propertyId === r.propertyId && p.taxYear === r.taxYear && p.taxType === r.taxType
-      ));
-      return fresh.length ? [...prev, ...fresh] : prev;
-    });
+    const fresh = toAdd.filter(r => !taxRecords.some(p =>
+      p.propertyId === r.propertyId && p.taxYear === r.taxYear && p.taxType === r.taxType
+    ));
+    for (const r of fresh) addPropertyTax(r);
   }, [entries]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openAdd  = () => { setForm({ ...EMPTY, id: crypto.randomUUID() }); setModal('add'); };
@@ -220,12 +215,12 @@ export default function PropertyTaxes() {
   const save = () => {
     if (!form.propertyId || !form.taxYear) return;
     const record = { ...form, annualAmount: Number(form.annualAmount) || 0 };
-    if (modal === 'add') setTaxRecords(prev => [...prev, record]);
-    else setTaxRecords(prev => prev.map(r => r.id === record.id ? record : r));
+    if (modal === 'add') addPropertyTax(record);
+    else updatePropertyTax(record);
     setModal(null);
   };
   const remove = (id) => {
-    if (confirm('Delete this tax record?')) setTaxRecords(prev => prev.filter(r => r.id !== id));
+    if (confirm('Delete this tax record?')) deletePropertyTax(id);
   };
 
   const statusBadge = (status) => {

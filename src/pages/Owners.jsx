@@ -1,15 +1,13 @@
 import { useState } from 'react';
 import { Plus, Pencil, Trash2, X, Check } from 'lucide-react';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { sampleOwners, sampleTransactions } from '../data/sampleData';
+import { useAppData } from '../context/AppData';
 import { useAuth } from '../context/Auth';
 
 const EMPTY = { id: '', firstName: '', lastName: '', email: '', phone: '', ownershipPct: '', notes: '' };
 const fmt = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function Owners() {
-  const [owners, setOwners] = useLocalStorage('lfjh_owners', sampleOwners);
-  const [transactions] = useLocalStorage('lfjh_transactions', sampleTransactions);
+  const { owners, addOwner, updateOwner, deleteOwner, transactions } = useAppData();
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState(EMPTY);
   const { canEdit } = useAuth();
@@ -27,13 +25,13 @@ export default function Owners() {
   const openEdit = (o) => { setForm(o); setModal('edit'); };
   const save = () => {
     if (!form.firstName || !form.lastName) return;
-    if (modal === 'add') setOwners(prev => [...prev, form]);
-    else setOwners(prev => prev.map(o => o.id === form.id ? form : o));
+    if (modal === 'add') addOwner(form);
+    else updateOwner(form);
     setModal(null);
   };
   const remove = (id) => {
     if (!confirm('Delete this owner?')) return;
-    setOwners(prev => prev.filter(o => o.id !== id));
+    deleteOwner(id);
   };
 
   const totalPct = owners.reduce((s, o) => s + (Number(o.ownershipPct) || 0), 0);

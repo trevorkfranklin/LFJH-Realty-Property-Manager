@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { Building2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/Auth';
 
-function AccountForm({ title, buttonLabel, onSubmit, showRole = false }) {
-  const [username, setUsername] = useState('');
+function AccountForm({ buttonLabel, onSubmit }) {
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole]         = useState('viewer');
   const [showPwd, setShowPwd]   = useState(false);
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
@@ -14,10 +13,10 @@ function AccountForm({ title, buttonLabel, onSubmit, showRole = false }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!username || !password) return;
+    if (!email || !password) return;
     setLoading(true);
     setError('');
-    const result = await onSubmit(username, password, role, username);
+    const result = await onSubmit(email, password);
     if (result?.error) setError(result.error);
     setLoading(false);
   };
@@ -26,7 +25,7 @@ function AccountForm({ title, buttonLabel, onSubmit, showRole = false }) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="text-xs text-slate-400 block mb-1">Email</label>
-        <input type="email" value={username} onChange={e => setUsername(e.target.value)} className={inputCls} autoFocus autoComplete="email" />
+        <input type="email" value={email} onChange={e => setEmail(e.target.value)} className={inputCls} autoFocus autoComplete="email" />
       </div>
       <div>
         <label className="text-xs text-slate-400 block mb-1">Password</label>
@@ -37,17 +36,8 @@ function AccountForm({ title, buttonLabel, onSubmit, showRole = false }) {
           </button>
         </div>
       </div>
-      {showRole && (
-        <div>
-          <label className="text-xs text-slate-400 block mb-1">Role</label>
-          <select value={role} onChange={e => setRole(e.target.value)} className={inputCls}>
-            <option value="admin">Admin — full access</option>
-            <option value="viewer">Viewer — read only</option>
-          </select>
-        </div>
-      )}
       {error && <p className="text-red-400 text-sm">{error}</p>}
-      <button type="submit" disabled={loading || !username || !password}
+      <button type="submit" disabled={loading || !email || !password}
         className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
         {loading ? 'Please wait…' : buttonLabel}
       </button>
@@ -56,7 +46,16 @@ function AccountForm({ title, buttonLabel, onSubmit, showRole = false }) {
 }
 
 export default function Login() {
-  const { login, createUser, needsSetup } = useAuth();
+  const { login, createFirstAdmin, needsSetup, session } = useAuth();
+
+  // Still initializing session
+  if (session === undefined) {
+    return (
+      <div className="flex-1 h-screen bg-navy-900 flex items-center justify-center">
+        <div className="text-slate-500 text-sm">Loading…</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 h-screen bg-navy-900 flex items-center justify-center p-4 overflow-auto">
@@ -73,21 +72,12 @@ export default function Login() {
             <>
               <h2 className="text-lg font-semibold text-white mb-1">Create Admin Account</h2>
               <p className="text-slate-400 text-sm mb-6">No accounts exist yet. Set up your admin account to get started.</p>
-              <AccountForm
-                title="Setup"
-                buttonLabel="Create Account & Sign In"
-                showRole={false}
-                onSubmit={async (u, p) => {
-                  const r = await createUser(u, p, 'admin');
-                  if (r.success) await login(u, p);
-                  return r;
-                }}
-              />
+              <AccountForm buttonLabel="Create Account & Sign In" onSubmit={createFirstAdmin} />
             </>
           ) : (
             <>
               <h2 className="text-lg font-semibold text-white mb-6">Sign In</h2>
-              <AccountForm title="Login" buttonLabel="Sign In" onSubmit={login} />
+              <AccountForm buttonLabel="Sign In" onSubmit={login} />
             </>
           )}
         </div>

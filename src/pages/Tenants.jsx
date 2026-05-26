@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Plus, Pencil, Trash2, X, Check, Users, UserPlus, Paperclip, ChevronDown, Download, Phone, Mail } from 'lucide-react';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { sampleTenants, sampleProperties } from '../data/sampleData';
+import { useAppData } from '../context/AppData';
 import { usePropertyFilter } from '../context/PropertyFilter';
 import { useAuth } from '../context/Auth';
 import { sortByStreetName, sortByLeaseEnd } from '../utils/sort';
@@ -217,8 +216,7 @@ function Modal({ title, form, setForm, onSave, onClose, properties }) {
 function initials(first, last) { return `${first?.[0] || ''}${last?.[0] || ''}`.toUpperCase(); }
 
 export default function Tenants() {
-  const [tenants, setTenants]   = useLocalStorage('lfjh_tenants', sampleTenants);
-  const [properties]            = useLocalStorage('lfjh_properties', sampleProperties);
+  const { tenants, addTenant, updateTenant, deleteTenant, properties } = useAppData();
   const { filterProperty }      = usePropertyFilter();
   const { canEdit } = useAuth();
   const [modal, setModal]       = useState(null);
@@ -240,11 +238,11 @@ export default function Tenants() {
   const save = () => {
     if (!form.firstName || !form.lastName) return;
     const record = { ...form, monthlyRent: Number(form.monthlyRent), depositPaid: Number(form.depositPaid), petDeposit: Number(form.petDeposit) || 0 };
-    if (modal === 'add') setTenants([...tenants, record]);
-    else setTenants(tenants.map(t => t.id === form.id ? record : t));
+    if (modal === 'add') addTenant(record);
+    else updateTenant(record);
     setModal(null);
   };
-  const remove = (id) => { if (confirm('Delete this tenant record?')) setTenants(tenants.filter(t => t.id !== id)); };
+  const remove = (id) => { if (confirm('Delete this tenant record?')) deleteTenant(id); };
   const daysUntilLeaseEnd = (dateStr) => { if (!dateStr) return null; return Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24)); };
 
   return (

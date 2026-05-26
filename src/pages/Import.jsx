@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import { Upload, Check, AlertCircle, RefreshCw, Landmark } from 'lucide-react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
-import { sampleTransactions, sampleProperties, TRANSACTION_CATEGORIES } from '../data/sampleData';
+import { TRANSACTION_CATEGORIES } from '../data/sampleData';
+import { useAppData } from '../context/AppData';
 import { sortByStreetName } from '../utils/sort';
 
 function parseLine(line) {
@@ -56,8 +57,7 @@ function guessField(row, candidates) {
 const fmt = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function Import() {
-  const [transactions, setTransactions] = useLocalStorage('lfjh_transactions', sampleTransactions);
-  const [properties] = useLocalStorage('lfjh_properties', sampleProperties);
+  const { transactions, bulkAddTransactions, updateTransaction, deleteTransaction, properties } = useAppData();
   const [mode, setMode] = useState('bank');
 
   // ── CSV state ──────────────────────────────────────────────────────────────
@@ -125,12 +125,12 @@ export default function Import() {
 
   const [csvSkipped, setCsvSkipped] = useState(0);
   const buildPreview = () => { setPreview(rows.slice(0, 20).map(buildRow)); setStep('preview'); };
-  const doImport = () => {
+  const doImport = async () => {
     const keys = existingKeys();
     const all = rows.map(buildRow);
     const fresh = all.filter(tx => !isDupe(tx, keys));
     setCsvSkipped(all.length - fresh.length);
-    setTransactions(prev => [...prev, ...fresh]);
+    await bulkAddTransactions(fresh);
     setStep('done');
   };
   const resetCsv = () => { setStep('upload'); setRows([]); setHeaders([]); setPreview([]); setCsvError(''); setCsvSkipped(0); if (fileRef.current) fileRef.current.value = ''; };
@@ -141,28 +141,26 @@ export default function Import() {
   const [cleanupResult, setCleanupResult] = useState(null);
   const cleanup = () => {
     const seen = new Set();
-    let removed = 0;
-    const unique = transactions
-      .filter(tx => {
-        const key = `${tx.date}|${tx.description}|${String(tx.amount)}|${tx.type}`;
-        if (seen.has(key)) { removed++; return false; }
-        seen.add(key);
-        return true;
-      })
-      .map(tx => ({ ...tx, id: crypto.randomUUID() }));
-    setTransactions(unique);
-    setCleanupResult(removed);
+    const toDelete = [];
+    transactions.forEach(tx => {
+      const key = `${tx.date}|${tx.description}|${String(tx.amount)}|${tx.type}`;
+      if (seen.has(key)) toDelete.push(tx.id);
+      else seen.add(key);
+    });
+    toDelete.forEach(id => deleteTransaction(id));
+    setCleanupResult(toDelete.length);
   };
 
   const [fixCount, setFixCount] = useState(null);
-  const fixDates = () => {
+  const fixDates = async () => {
     let fixed = 0;
-    const updated = transactions.map(tx => {
+    for (const tx of transactions) {
       const normalized = normalizeDate(tx.date);
-      if (normalized !== tx.date) { fixed++; return { ...tx, date: normalized }; }
-      return tx;
-    });
-    setTransactions(updated);
+      if (normalized !== tx.date) {
+        fixed++;
+        await updateTransaction({ ...tx, date: normalized });
+      }
+    }
     setFixCount(fixed);
   };
 
@@ -171,7 +169,7 @@ export default function Import() {
   const removeCsvImports = () => {
     if (!csvImported.length) { setRemoveCount(0); return; }
     if (!confirm(`Delete all ${csvImported.length} CSV-imported transactions? You can re-import the files to replace them.`)) return;
-    setTransactions(transactions.filter(tx => tx.notes !== 'Imported from CSV'));
+    csvImported.forEach(tx => deleteTransaction(tx.id));
     setRemoveCount(csvImported.length);
   };
 
@@ -249,19 +247,17 @@ export default function Import() {
     }
   }
 
-  function sfImport() {
-    setTransactions(prev => {
-      const { sfIds, fullKeys, dateAmtKeys } = buildDedupSets(prev);
-      const fresh = sfPreview
-        .filter(tx => !tx._dupe)
-        .filter(tx => {
-          if (tx.sfTxId && sfIds.has(tx.sfTxId)) return false;
-          if (fullKeys.has(`${tx.date}|${tx.description}|${Number(tx.amount)}|${tx.type}`)) return false;
-          return !dateAmtKeys.has(`${tx.date}|${Number(tx.amount)}`);
-        })
-        .map(({ _dupe, ...tx }) => tx);
-      return [...prev, ...fresh];
-    });
+  async function sfImport() {
+    const { sfIds, fullKeys, dateAmtKeys } = buildDedupSets(transactions);
+    const fresh = sfPreview
+      .filter(tx => !tx._dupe)
+      .filter(tx => {
+        if (tx.sfTxId && sfIds.has(tx.sfTxId)) return false;
+        if (fullKeys.has(`${tx.date}|${tx.description}|${Number(tx.amount)}|${tx.type}`)) return false;
+        return !dateAmtKeys.has(`${tx.date}|${Number(tx.amount)}`);
+      })
+      .map(({ _dupe, ...tx }) => tx);
+    await bulkAddTransactions(fresh);
     setSfStep('done');
   }
 

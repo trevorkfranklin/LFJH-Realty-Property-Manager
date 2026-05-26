@@ -2,8 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, ArrowLeftRight, Upload, Building2, DollarSign, TrendingUp, Users, Home, LogOut, ShieldCheck, Bell, MessageSquare, UserCheck } from 'lucide-react';
 import { useNotificationCount } from '../pages/Notifications';
 import { useAuth } from '../context/Auth';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import { sampleProperties } from '../data/sampleData';
+import { useAppData } from '../context/AppData';
 import { usePropertyFilter } from '../context/PropertyFilter';
 import { sortByStreetName } from '../utils/sort';
 
@@ -23,16 +22,15 @@ const navItems = [
 ];
 
 export default function Sidebar() {
-  const [properties] = useLocalStorage('lfjh_properties', sampleProperties);
+  const { properties } = useAppData();
   const { filterProperty, setFilterProperty } = usePropertyFilter();
-  const { session, logout, isAdmin } = useAuth();
+  const { session, profile, logout, isAdmin } = useAuth();
   const pendingCount = useNotificationCount();
   const location = useLocation();
   const onImport = location.pathname === '/import';
 
   return (
     <aside className="w-64 h-screen flex flex-col flex-shrink-0 bg-navy-900 border-r border-navy-700">
-      {/* Branding — always visible */}
       <div className="flex items-center gap-3 px-5 py-6 border-b border-navy-700 flex-shrink-0">
         <div className="w-11 h-11 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
           <Building2 size={22} className="text-white" />
@@ -42,13 +40,11 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Property filter — always visible, below branding */}
-      {/* Signed-in user */}
       {session && (
         <div className="px-3 pb-2 border-t border-navy-700 pt-3 flex items-center justify-between">
           <div className="min-w-0">
-            <div className="text-xs text-white font-medium truncate">{session.username}</div>
-            <div className="text-xs text-slate-500">{session.role === 'admin' ? 'Admin' : 'Viewer'}</div>
+            <div className="text-xs text-white font-medium truncate">{session.user.email}</div>
+            <div className="text-xs text-slate-500">{profile?.role === 'admin' ? 'Admin' : 'Viewer'}</div>
           </div>
           <button onClick={logout} title="Sign out" className="text-slate-500 hover:text-red-400 flex-shrink-0 ml-2">
             <LogOut size={15} />
@@ -78,7 +74,6 @@ export default function Sidebar() {
         </div>
       )}
 
-      {/* Nav — scrollable if content overflows */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
         {navItems.filter(item => !item.adminOnly || isAdmin).map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} end={to === '/'}

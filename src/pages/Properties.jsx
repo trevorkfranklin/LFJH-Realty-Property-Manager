@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Plus, Pencil, Trash2, X, Check, Building2, RefreshCw, TrendingUp, Landmark, Camera } from 'lucide-react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
-import { sampleProperties, PROPERTY_TYPES } from '../data/sampleData';
+import { PROPERTY_TYPES } from '../data/sampleData';
 import { usePropertyFilter } from '../context/PropertyFilter';
 import { useAuth } from '../context/Auth';
+import { useAppData } from '../context/AppData';
 import { fetchPropertyEstimates } from '../utils/rentcast';
 import { fetchAccounts } from '../utils/simplefin';
 import { sortByStreetName } from '../utils/sort';
@@ -70,7 +71,6 @@ function PropertyPhoto({ propertyId }) {
     </div>
   );
 }
-import { sampleTenants } from '../data/sampleData';
 
 const EMPTY = { id: '', name: '', address: '', type: 'Single Family', purchasePrice: '', monthlyRent: '', bedrooms: '', bathrooms: '', sqft: '', status: 'Occupied', notes: '', mortgageAccountId: '', hoa: '', hoaUrl: '', mudDistrict: '', mudUrl: '' };
 
@@ -121,8 +121,7 @@ function Modal({ title, form, setForm, onSave, onClose, sfAccounts }) {
 }
 
 export default function Properties() {
-  const [properties, setProperties] = useLocalStorage('lfjh_properties', sampleProperties);
-  const [tenants] = useLocalStorage('lfjh_tenants', sampleTenants);
+  const { properties, addProperty, updateProperty, deleteProperty, tenants } = useAppData();
   const [rentcastData, setRentcastData] = useLocalStorage('lfjh_rentcast', {});
   const [sfAccounts, setSfAccounts]     = useLocalStorage('lfjh_simplefin_accounts', {});
   const [mortgageSyncDate, setMortgageSyncDate] = useLocalStorage('lfjh_mortgage_sync_date', '');
@@ -219,11 +218,11 @@ export default function Properties() {
   const save = () => {
     if (!form.name) return;
     const record = { ...form, purchasePrice: Number(form.purchasePrice), monthlyRent: Number(form.monthlyRent), bedrooms: Number(form.bedrooms), bathrooms: Number(form.bathrooms), sqft: Number(form.sqft) };
-    if (modal === 'add') setProperties([...properties, record]);
-    else setProperties(properties.map(p => p.id === form.id ? record : p));
+    if (modal === 'add') addProperty(record);
+    else updateProperty(record);
     setModal(null);
   };
-  const remove = (id) => { if (confirm('Delete this property?')) setProperties(properties.filter(p => p.id !== id)); };
+  const remove = (id) => { if (confirm('Delete this property?')) deleteProperty(id); };
   const statusColor = (s) => ({ Occupied: 'bg-emerald-400/10 text-emerald-400', Vacant: 'bg-yellow-400/10 text-yellow-400', Maintenance: 'bg-red-400/10 text-red-400' }[s] || 'bg-slate-400/10 text-slate-400');
   const totalMonthlyRent = properties.reduce((s, p) => {
     const t = activeTenant(p.id);

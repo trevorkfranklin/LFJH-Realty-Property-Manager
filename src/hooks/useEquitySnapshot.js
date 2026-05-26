@@ -1,20 +1,16 @@
 import { useEffect } from 'react';
 import { useLocalStorage } from './useLocalStorage';
-import { sampleProperties } from '../data/sampleData';
+import { useAppData } from '../context/AppData';
 
-// Captures a monthly equity snapshot (estimated value vs mortgage balance per property).
-// Runs on every app load; only writes if the current month doesn't already have a snapshot
-// AND both RentCast data and SimpleFIN account data are present.
 export function useEquitySnapshot() {
-  const [properties]   = useLocalStorage('lfjh_properties', sampleProperties);
+  const { properties } = useAppData();
   const [rentcastData] = useLocalStorage('lfjh_rentcast', {});
   const [sfAccounts]   = useLocalStorage('lfjh_simplefin_accounts', {});
   const [, setSnapshots] = useLocalStorage('lfjh_equity_snapshots', {});
 
   useEffect(() => {
+    if (!properties.length) return;
     const month = new Date().toISOString().slice(0, 7);
-
-    // Check existing snapshots without triggering re-renders
     const existing = JSON.parse(localStorage.getItem('lfjh_equity_snapshots') || '{}');
     if (existing[month]) return;
 

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Bell, Send, X, Plus, Check, Edit2, ToggleLeft, ToggleRight, Clock, AlertTriangle } from 'lucide-react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
-import { sampleTenants, sampleProperties, samplePropertyTaxes, sampleHOADues } from '../data/sampleData';
+import { useAppData } from '../context/AppData';
 import { useAuth } from '../context/Auth';
 import { sortByStreetName } from '../utils/sort';
 
@@ -26,10 +26,7 @@ function daysUntil(d) { return Math.ceil((new Date(d) - new Date(TODAY)) / 86400
 export function useNotificationCount() {
   const [rules]      = useLocalStorage('lfjh_notif_rules', DEFAULT_RULES);
   const [history]    = useLocalStorage('lfjh_notif_history', []);
-  const [tenants]    = useLocalStorage('lfjh_tenants', sampleTenants);
-  const [properties] = useLocalStorage('lfjh_properties', sampleProperties);
-  const [taxes]      = useLocalStorage('lfjh_property_taxes', samplePropertyTaxes);
-  const [hoa]        = useLocalStorage('lfjh_hoa_dues', sampleHOADues);
+  const { tenants, properties, propertyTaxes: taxes, hoaDues: hoa } = useAppData();
 
   return useMemo(() => {
     const sent = new Set(history.filter(h => h.status !== 'pending').map(h => h.key));
@@ -129,13 +126,10 @@ function RuleModal({ rule, onSave, onClose }) {
 }
 
 export default function Notifications() {
-  const { users, canEdit } = useAuth();
+  const { profiles: users, canEdit } = useAuth();
   const [rules, setRules]     = useLocalStorage('lfjh_notif_rules', DEFAULT_RULES);
   const [history, setHistory] = useLocalStorage('lfjh_notif_history', []);
-  const [tenants]    = useLocalStorage('lfjh_tenants', sampleTenants);
-  const [properties] = useLocalStorage('lfjh_properties', sampleProperties);
-  const [taxes]      = useLocalStorage('lfjh_property_taxes', samplePropertyTaxes);
-  const [hoa]        = useLocalStorage('lfjh_hoa_dues', sampleHOADues);
+  const { tenants, properties, propertyTaxes: taxes, hoaDues: hoa } = useAppData();
   const [tab, setTab]           = useState('queue');
   const [editRule, setEditRule] = useState(null);
   const [showNewRule, setShowNewRule] = useState(false);
@@ -182,7 +176,7 @@ export default function Notifications() {
           const key = `${rule.id}_${r.id}`;
           if (sent.has(key)) continue;
           const pName = propName(r.propertyId);
-          const userEmails = users.filter(u => u.role === 'admin').map(u => u.username).join(', ');
+          const userEmails = users.filter(u => u.role === 'admin').map(u => u.email).join(', ');
           const vars = { propertyName: pName, taxYear: r.taxYear, taxType: r.taxType || '', dueDate: fmtDate(r.dueDate), balance: fmtMoney(r.annualAmount), year: r.taxYear };
           items.push({ key, ruleId: rule.id, type: rule.type, ruleName: rule.name, recipientEmail: userEmails, recipientName: 'Admin', propertyName: pName, subject: fill(rule.subject, vars), body: fill(rule.body, vars), daysUntil: d, urgent: d <= 7 });
         }
@@ -193,7 +187,7 @@ export default function Notifications() {
           const key = `${rule.id}_${r.id}`;
           if (sent.has(key)) continue;
           const pName = propName(r.propertyId);
-          const userEmails = users.filter(u => u.role === 'admin').map(u => u.username).join(', ');
+          const userEmails = users.filter(u => u.role === 'admin').map(u => u.email).join(', ');
           const vars = { propertyName: pName, year: r.year, dueDate: fmtDate(r.dueDate), balance: fmtMoney(r.annualAmount) };
           items.push({ key, ruleId: rule.id, type: rule.type, ruleName: rule.name, recipientEmail: userEmails, recipientName: 'Admin', propertyName: pName, subject: fill(rule.subject, vars), body: fill(rule.body, vars), daysUntil: d, urgent: d <= 7 });
         }

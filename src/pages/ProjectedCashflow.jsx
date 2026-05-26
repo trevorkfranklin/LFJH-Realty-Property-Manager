@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
-import { sampleTransactions, sampleProperties, sampleTenants, samplePropertyTaxes, sampleHOADues } from '../data/sampleData';
+import { useAppData } from '../context/AppData';
 import { txInMonth, txInYear, amountForMonth, amountForPropertyMonth, amountForPropertyYear } from '../utils/transactions';
 import { sortByStreetName } from '../utils/sort';
 import { usePropertyFilter } from '../context/PropertyFilter';
@@ -56,11 +56,7 @@ function Bar({ income, expense, ownerDraw, taxDue, maxVal, height }) {
 }
 
 export default function ProjectedCashflow() {
-  const [transactions]  = useLocalStorage('lfjh_transactions', sampleTransactions);
-  const [properties]   = useLocalStorage('lfjh_properties', sampleProperties);
-  const [tenants]      = useLocalStorage('lfjh_tenants', sampleTenants);
-  const [taxRecords]   = useLocalStorage('lfjh_property_taxes', samplePropertyTaxes);
-  const [hoaRecords]   = useLocalStorage('lfjh_hoa_dues', sampleHOADues);
+  const { transactions, properties, tenants, propertyTaxes: taxRecords, hoaDues: hoaRecords } = useAppData();
   const [sfAccounts]   = useLocalStorage('lfjh_simplefin_accounts', {});
 
   const { filterProperty } = usePropertyFilter();
