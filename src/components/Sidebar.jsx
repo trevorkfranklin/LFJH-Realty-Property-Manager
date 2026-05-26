@@ -33,8 +33,8 @@ export default function Sidebar() {
   return (
     <aside className="w-64 h-screen flex flex-col flex-shrink-0 bg-navy-900 border-r border-navy-700">
       <div className="flex items-center justify-center px-4 py-3 border-b border-navy-700 flex-shrink-0">
-        <div className="bg-white rounded-xl px-3 py-1.5">
-          <img src="/logo.png" alt="LT²D Realty, LLC" className="h-12 w-auto object-contain" />
+        <div className="bg-white rounded-xl px-3 py-2">
+          <img src="/logo.png" alt="LT²D Realty, LLC" className="h-24 w-auto object-contain" />
         </div>
       </div>
 
