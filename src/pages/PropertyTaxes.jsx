@@ -238,7 +238,7 @@ export default function PropertyTaxes() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       {modal && <Modal title={modal === 'add' ? 'Add Tax Record' : 'Edit Tax Record'} form={form} setForm={setForm} onSave={save} onClose={() => setModal(null)} properties={properties} />}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -271,7 +271,8 @@ export default function PropertyTaxes() {
       </div>
 
       <div className="bg-navy-800 rounded-xl border border-navy-700 overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[560px]">
           <thead>
             <tr className="border-b border-navy-700 text-slate-400 text-xs uppercase">
               <th className="text-left px-5 py-3 w-6"></th>
@@ -344,6 +345,7 @@ export default function PropertyTaxes() {
             {filtered.length === 0 && <tr><td colSpan={10} className="px-5 py-10 text-center text-slate-500">No tax records found</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

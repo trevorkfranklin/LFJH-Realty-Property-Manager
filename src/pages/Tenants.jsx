@@ -246,7 +246,7 @@ export default function Tenants() {
   const daysUntilLeaseEnd = (dateStr) => { if (!dateStr) return null; return Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24)); };
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       {modal && <Modal title={modal === 'add' ? 'Add Tenant' : 'Edit Tenant'} form={form} setForm={setForm} onSave={save} onClose={() => setModal(null)} properties={properties} />}
       <div className="flex items-center justify-between mb-6">
         <div>

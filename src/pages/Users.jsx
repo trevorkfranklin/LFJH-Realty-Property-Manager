@@ -110,7 +110,7 @@ export default function Users() {
     : <span className="text-xs px-2 py-0.5 rounded-full bg-slate-400/10 text-slate-400">Viewer</span>;
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       {showAdd && <AddUserModal onClose={() => setShowAdd(false)} />}
       {showChangePwd && <ChangePasswordModal onClose={() => setShowChangePwd(false)} />}
 
@@ -130,7 +130,8 @@ export default function Users() {
       </div>
 
       <div className="bg-navy-800 rounded-xl border border-navy-700 overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[480px]">
           <thead>
             <tr className="border-b border-navy-700 text-slate-400 text-xs uppercase">
               <th className="text-left px-5 py-3">Email</th>
@@ -167,6 +168,7 @@ export default function Users() {
             {profiles.length === 0 && <tr><td colSpan={4} className="px-5 py-10 text-center text-slate-500">No users found</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ArrowLeftRight, Upload, Building2, DollarSign, TrendingUp, Users, Home, LogOut, ShieldCheck, Bell, MessageSquare, UserCheck, HardDriveDownload } from 'lucide-react';
+import { LayoutDashboard, ArrowLeftRight, Upload, Building2, DollarSign, TrendingUp, Users, Home, LogOut, ShieldCheck, Bell, MessageSquare, UserCheck, HardDriveDownload, X } from 'lucide-react';
 import { useNotificationCount } from '../pages/Notifications';
 import { useAuth } from '../context/Auth';
 import { useAppData } from '../context/AppData';
@@ -22,7 +22,7 @@ const navItems = [
   { to: '/migrate',      label: 'Migrate Data',    icon: HardDriveDownload, adminOnly: true },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ mobileOpen, onClose }) {
   const { properties } = useAppData();
   const { filterProperty, setFilterProperty } = usePropertyFilter();
   const { session, profile, logout, isAdmin } = useAuth();
@@ -31,11 +31,14 @@ export default function Sidebar() {
   const onImport = location.pathname === '/import';
 
   return (
-    <aside className="w-64 h-screen flex flex-col flex-shrink-0 bg-navy-900 border-r border-navy-700">
-      <div className="flex items-center justify-center px-4 py-3 border-b border-navy-700 flex-shrink-0">
+    <aside className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col bg-navy-900 border-r border-navy-700 transition-transform duration-200 ease-in-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 md:flex-shrink-0`}>
+      <div className="relative flex items-center justify-center px-4 py-3 border-b border-navy-700 flex-shrink-0">
         <div className="bg-white rounded-xl px-3 py-2">
           <img src="/logo.png" alt="LT²D Realty, LLC" className="h-24 w-auto object-contain" />
         </div>
+        <button onClick={onClose} className="md:hidden absolute right-3 top-3 text-slate-400 hover:text-white">
+          <X size={18} />
+        </button>
       </div>
 
       {session && (
@@ -74,7 +77,7 @@ export default function Sidebar() {
 
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
         {navItems.filter(item => !item.adminOnly || isAdmin).map(({ to, label, icon: Icon }) => (
-          <NavLink key={to} to={to} end={to === '/'}
+          <NavLink key={to} to={to} end={to === '/'} onClick={onClose}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive ? 'bg-navy-700 text-emerald-400' : 'text-slate-300 hover:bg-navy-800 hover:text-white'

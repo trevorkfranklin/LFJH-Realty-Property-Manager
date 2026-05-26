@@ -37,7 +37,7 @@ export default function Owners() {
   const totalPct = owners.reduce((s, o) => s + (Number(o.ownershipPct) || 0), 0);
 
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="p-4 md:p-8 max-w-4xl">
       {modal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-navy-800 rounded-xl border border-navy-700 w-full max-w-md">
@@ -102,7 +102,8 @@ export default function Owners() {
       ) : (
         <>
           <div className="bg-navy-800 rounded-xl border border-navy-700 overflow-hidden mb-4">
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[480px]">
               <thead>
                 <tr className="border-b border-navy-700 text-slate-400 text-xs uppercase">
                   <th className="text-left px-5 py-3">Name</th>
@@ -151,6 +152,7 @@ export default function Owners() {
                 </tfoot>
               )}
             </table>
+            </div>
           </div>
 
           {unassignedDraws.length > 0 && (

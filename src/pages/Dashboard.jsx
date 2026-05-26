@@ -106,7 +106,7 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white">Dashboard</h1>
         <p className="text-slate-400 text-sm mt-1">Property Finance Overview — {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>

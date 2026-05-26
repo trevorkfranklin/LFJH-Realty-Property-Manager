@@ -371,7 +371,7 @@ export default function Transactions() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       {modal && (
         <SplitModal
           title={modal === 'add' ? 'Add Transaction' : 'Edit Transaction'}
@@ -440,7 +440,8 @@ export default function Transactions() {
         <div className="bg-navy-800 border border-navy-700 rounded-lg px-4 py-2 text-sm"><span className="text-slate-400">Net: </span><span className={`font-semibold ${totals.net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmtAmt(totals.net)}</span></div>
       </div>
       <div className="bg-navy-800 rounded-xl border border-navy-700 overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="border-b border-navy-700 text-slate-400 text-xs uppercase">
               <th className="text-left px-5 py-3">Date</th>
@@ -502,6 +503,7 @@ export default function Transactions() {
             {filtered.length === 0 && <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-500">No transactions found</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
