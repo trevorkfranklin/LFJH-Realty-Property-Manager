@@ -62,7 +62,7 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
           <div className="bg-white rounded-xl px-4 py-2">
-            <img src="/logo.png" alt="LT²D Realty, LLC" className="h-24 w-auto object-contain" />
+            <img src="/logo.png" alt="LT²D Realty, LLC" className="h-36 w-auto object-contain" />
           </div>
         </div>
 
