@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { Upload, Check, AlertCircle, RefreshCw, Landmark } from 'lucide-react';
-import { useLocalStorage } from '../hooks/useLocalStorage';
 import { TRANSACTION_CATEGORIES } from '../data/sampleData';
 import { useAppData } from '../context/AppData';
 import { sortByStreetName } from '../utils/sort';
@@ -199,7 +198,7 @@ export default function Import() {
       const res = await fetch(claimUrl, { method: 'POST' });
       if (!res.ok) throw new Error(`Claim failed (${res.status})`);
       const accessUrl = (await res.text()).trim();
-      setSfAccessUrl(accessUrl);
+      await setSfAccessUrl(accessUrl);
       setSfStep('sync');
     } catch (e) {
       setSfError(e.message || 'Could not connect — check your token and try again.');
