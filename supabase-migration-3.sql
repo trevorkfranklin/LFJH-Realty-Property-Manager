@@ -5,15 +5,13 @@ create table if not exists public.settings (
 );
 alter table public.settings enable row level security;
 
--- Any authenticated user can read settings
+drop policy if exists "Authenticated users can read settings" on public.settings;
+drop policy if exists "Admins can write settings" on public.settings;
+
 create policy "Authenticated users can read settings" on public.settings
   for select to authenticated using (true);
 
--- Only admins can write settings
 create policy "Admins can write settings" on public.settings
   for all to authenticated using (
     exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
   );
-
--- Allow the service role (scheduled agent) to read settings
--- (service role bypasses RLS by default, so no extra policy needed)
