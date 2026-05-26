@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/Auth';
 
 function AccountForm({ buttonLabel, onSubmit }) {
@@ -60,11 +60,10 @@ export default function Login() {
   return (
     <div className="flex-1 h-screen bg-navy-900 flex items-center justify-center p-4 overflow-auto">
       <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Building2 size={24} className="text-white" />
+        <div className="flex justify-center mb-8">
+          <div className="bg-white rounded-xl px-4 py-2">
+            <img src="/logo.png" alt="LT²D Realty, LLC" className="h-24 w-auto object-contain" />
           </div>
-          <div className="font-bold text-white text-xl leading-tight">LFJH (aka LT²D) Realty, LLC</div>
         </div>
 
         <div className="bg-navy-800 rounded-xl border border-navy-700 p-8">
