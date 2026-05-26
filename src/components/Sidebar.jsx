@@ -1,5 +1,11 @@
-import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ArrowLeftRight, Upload, Building2, DollarSign, TrendingUp, Users } from 'lucide-react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { LayoutDashboard, ArrowLeftRight, Upload, Building2, DollarSign, TrendingUp, Users, Home, LogOut, ShieldCheck, Bell, MessageSquare, UserCheck } from 'lucide-react';
+import { useNotificationCount } from '../pages/Notifications';
+import { useAuth } from '../context/Auth';
+import { useLocalStorage } from '../hooks/useLocalStorage';
+import { sampleProperties } from '../data/sampleData';
+import { usePropertyFilter } from '../context/PropertyFilter';
+import { sortByStreetName } from '../utils/sort';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -7,31 +13,87 @@ const navItems = [
   { to: '/import', label: 'Import', icon: Upload },
   { to: '/properties', label: 'Properties', icon: Building2 },
   { to: '/property-taxes', label: 'Property Taxes', icon: DollarSign },
+  { to: '/hoa-dues',      label: 'HOA Dues',        icon: Home },
   { to: '/projected-cashflow', label: 'Projected Cashflow', icon: TrendingUp },
-  { to: '/tenants', label: 'Tenants', icon: Users },
+  { to: '/tenants',       label: 'Tenants',         icon: Users },
+  { to: '/owners',        label: 'Owners',          icon: UserCheck },
+  { to: '/chat',          label: 'AI Assistant',    icon: MessageSquare },
+  { to: '/notifications', label: 'Notifications',   icon: Bell },
+  { to: '/users',         label: 'Users',           icon: ShieldCheck, adminOnly: true },
 ];
 
 export default function Sidebar() {
+  const [properties] = useLocalStorage('lfjh_properties', sampleProperties);
+  const { filterProperty, setFilterProperty } = usePropertyFilter();
+  const { session, logout, isAdmin } = useAuth();
+  const pendingCount = useNotificationCount();
+  const location = useLocation();
+  const onImport = location.pathname === '/import';
+
   return (
-    <aside className="w-64 min-h-screen bg-navy-900 flex flex-col flex-shrink-0 border-r border-navy-700">
-      <div className="flex items-center gap-3 px-5 py-6 border-b border-navy-700">
+    <aside className="w-64 h-screen flex flex-col flex-shrink-0 bg-navy-900 border-r border-navy-700">
+      {/* Branding — always visible */}
+      <div className="flex items-center gap-3 px-5 py-6 border-b border-navy-700 flex-shrink-0">
         <div className="w-11 h-11 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
           <Building2 size={22} className="text-white" />
         </div>
         <div>
-          <div className="font-bold text-white text-base leading-tight">LFJH Realty</div>
-          <div className="text-slate-400 text-xs">Property Finance</div>
+          <div className="font-bold text-white text-base leading-tight">LT²D Realty, LLC</div>
         </div>
       </div>
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map(({ to, label, icon: Icon }) => (
+
+      {/* Property filter — always visible, below branding */}
+      {/* Signed-in user */}
+      {session && (
+        <div className="px-3 pb-2 border-t border-navy-700 pt-3 flex items-center justify-between">
+          <div className="min-w-0">
+            <div className="text-xs text-white font-medium truncate">{session.username}</div>
+            <div className="text-xs text-slate-500">{session.role === 'admin' ? 'Admin' : 'Viewer'}</div>
+          </div>
+          <button onClick={logout} title="Sign out" className="text-slate-500 hover:text-red-400 flex-shrink-0 ml-2">
+            <LogOut size={15} />
+          </button>
+        </div>
+      )}
+
+      {!onImport && properties.length > 0 && (
+        <div className="px-3 py-3 border-b border-navy-700 flex-shrink-0">
+          <div className="text-xs text-slate-500 uppercase tracking-wide mb-1.5 px-1">Property Filter</div>
+          <select
+            value={filterProperty}
+            onChange={e => setFilterProperty(e.target.value)}
+            className="w-full bg-navy-800 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white"
+          >
+            <option value="">All Properties</option>
+            {sortByStreetName(properties).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          {filterProperty && (
+            <button
+              onClick={() => setFilterProperty('')}
+              className="mt-1 w-full text-xs text-slate-500 hover:text-slate-300 text-center"
+            >
+              Clear filter
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Nav — scrollable if content overflows */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        {navItems.filter(item => !item.adminOnly || isAdmin).map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} end={to === '/'}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive ? 'bg-navy-700 text-emerald-400' : 'text-slate-300 hover:bg-navy-800 hover:text-white'
               }`
             }>
-            <Icon size={18} />{label}
+            <Icon size={18} />
+            <span className="flex-1">{label}</span>
+            {to === '/notifications' && pendingCount > 0 && (
+              <span className="bg-yellow-400 text-navy-900 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
+                {pendingCount > 9 ? '9+' : pendingCount}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

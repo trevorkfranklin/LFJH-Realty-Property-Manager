@@ -1,13 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Plus, Pencil, Trash2, X, Check, ChevronRight, ChevronDown } from 'lucide-react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
-import { samplePropertyTaxes, sampleProperties, sampleTransactions } from '../data/sampleData';
+import { sampleHOADues, sampleProperties, sampleTransactions } from '../data/sampleData';
 import { usePropertyFilter } from '../context/PropertyFilter';
 import { useAuth } from '../context/Auth';
 import { sortByStreetName } from '../utils/sort';
 
-const EMPTY = { id: '', propertyId: '', taxYear: new Date().getFullYear(), taxType: '', annualAmount: '', dueDate: '', notes: '' };
-const TAX_TYPES = ['County', 'MUD'];
+const EMPTY = { id: '', propertyId: '', year: new Date().getFullYear(), annualAmount: '', dueDate: '', notes: '' };
 
 function Modal({ title, form, setForm, onSave, onClose, properties }) {
   const inputCls = 'w-full bg-navy-900 border border-navy-700 rounded-lg px-3 py-2 text-sm text-white';
@@ -27,15 +26,8 @@ function Modal({ title, form, setForm, onSave, onClose, properties }) {
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-400 block mb-1">Tax Year *</label>
-            <input type="number" value={form.taxYear} onChange={e => setForm({ ...form, taxYear: Number(e.target.value) })} className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs text-slate-400 block mb-1">Tax Type *</label>
-            <select value={form.taxType || ''} onChange={e => setForm({ ...form, taxType: e.target.value })} className={inputCls}>
-              <option value="">— Not specified —</option>
-              {TAX_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
+            <label className="text-xs text-slate-400 block mb-1">Year *</label>
+            <input type="number" value={form.year} onChange={e => setForm({ ...form, year: Number(e.target.value) })} className={inputCls} />
           </div>
           <div>
             <label className="text-xs text-slate-400 block mb-1">Annual Amount ($)</label>
@@ -52,29 +44,28 @@ function Modal({ title, form, setForm, onSave, onClose, properties }) {
         </div>
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-navy-700">
           <button onClick={onClose} className="px-4 py-2 text-sm text-slate-400 hover:text-white">Cancel</button>
-          <button onClick={onSave} disabled={!form.propertyId || !form.taxYear} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Check size={14} /> Save</button>
+          <button onClick={onSave} disabled={!form.propertyId || !form.year} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white rounded-lg text-sm font-medium flex items-center gap-2"><Check size={14} /> Save</button>
         </div>
       </div>
     </div>
   );
 }
 
-export default function PropertyTaxes() {
-  const [taxRecords, setTaxRecords] = useLocalStorage('lfjh_property_taxes', samplePropertyTaxes);
+export default function HOADues() {
+  const [hoaRecords, setHoaRecords] = useLocalStorage('lfjh_hoa_dues', sampleHOADues);
   const [transactions] = useLocalStorage('lfjh_transactions', sampleTransactions);
-  const [properties] = useLocalStorage('lfjh_properties', sampleProperties);
-  const [modal, setModal] = useState(null);
-  const [form, setForm] = useState(EMPTY);
-  const { filterProperty } = usePropertyFilter();
+  const [properties]   = useLocalStorage('lfjh_properties', sampleProperties);
+  const [modal, setModal]           = useState(null);
+  const [form, setForm]             = useState(EMPTY);
+  const { filterProperty }          = usePropertyFilter();
   const { canEdit } = useAuth();
   const [filterStatus, setFilterStatus] = useState('All');
-  const [filterYear, setFilterYear] = useState('');
-  const [filterType, setFilterType] = useState('');
-  const [expanded, setExpanded] = useState(new Set());
+  const [filterYear, setFilterYear]     = useState('');
+  const [expanded, setExpanded]         = useState(new Set());
 
-  const fmt = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt      = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const propName = (id) => properties.find(p => p.id === id)?.name || '—';
-  const today = new Date().toISOString().slice(0, 10);
+  const today    = new Date().toISOString().slice(0, 10);
 
   const toggleExpanded = (id) => setExpanded(prev => {
     const next = new Set(prev);
@@ -82,18 +73,20 @@ export default function PropertyTaxes() {
     return next;
   });
 
-  // Key: `propertyId|taxYear|taxType`
+  // Build payment map from HOA Fees transactions: key = `propertyId|year`
   const paymentMap = useMemo(() => {
     const map = new Map();
     transactions
-      .filter(tx => tx.category === 'Property Tax' && tx.taxYear && !tx.excluded)
+      .filter(tx => tx.category === 'HOA Fees' && !tx.excluded)
       .forEach(tx => {
-        const key = `${tx.propertyId || ''}|${tx.taxYear}|${tx.taxType || ''}`;
+        // Use transaction year if no explicit taxYear field
+        const year = tx.taxYear || new Date(tx.date).getFullYear();
+        const key  = `${tx.propertyId || ''}|${year}`;
         const prev = map.get(key) || { total: 0, lastDate: '', txList: [] };
         map.set(key, {
-          total: prev.total + Number(tx.amount),
+          total:    prev.total + Number(tx.amount),
           lastDate: tx.date > prev.lastDate ? tx.date : prev.lastDate,
-          txList: [...prev.txList, tx],
+          txList:   [...prev.txList, tx],
         });
       });
     return map;
@@ -103,31 +96,29 @@ export default function PropertyTaxes() {
     const seen = new Set();
     const result = [];
 
-    for (const r of taxRecords) {
-      const key = `${r.propertyId}|${r.taxYear}|${r.taxType || ''}`;
+    for (const r of hoaRecords) {
+      const key      = `${r.propertyId}|${r.year}`;
       seen.add(key);
       const payments = paymentMap.get(key) || { total: 0, lastDate: '', txList: [] };
       const obligation = Number(r.annualAmount) || 0;
-      const paid = payments.total;
-      const balance = obligation > 0 ? obligation - paid : 0;
+      const paid     = payments.total;
+      const balance  = obligation > 0 ? obligation - paid : 0;
       const isPastDue = r.dueDate && r.dueDate < today;
-      const status =
+      const status   =
         (obligation === 0 && paid > 0) || (paid >= obligation && obligation > 0) ? 'Paid'
         : paid > 0 ? 'Partial'
-        : isPastDue ? 'Unpaid'
+        : isPastDue  ? 'Unpaid'
         : 'Upcoming';
-      result.push({ ...r, taxType: r.taxType || '', amountPaid: paid, lastPaymentDate: payments.lastDate, balance, status, txList: payments.txList });
+      result.push({ ...r, amountPaid: paid, lastPaymentDate: payments.lastDate, balance, status, txList: payments.txList });
     }
 
     for (const [key, data] of paymentMap) {
       if (seen.has(key)) continue;
-      const parts = key.split('|');
-      const [propId, year, taxType] = parts;
+      const [propId, yr] = key.split('|');
       result.push({
         id: `derived|${key}`,
         propertyId: propId,
-        taxYear: Number(year),
-        taxType: taxType || '',
+        year: Number(yr),
         annualAmount: 0,
         dueDate: '',
         notes: '',
@@ -140,138 +131,112 @@ export default function PropertyTaxes() {
       });
     }
 
-    const dueKey = (e) => e.dueDate || '9999-12-31'; // no due date sorts last
     return result.sort((a, b) =>
-      a.taxYear - b.taxYear ||
-      dueKey(a).localeCompare(dueKey(b)) ||
+      a.year - b.year ||
+      (dueKey(a)).localeCompare(dueKey(b)) ||
       propName(a.propertyId).localeCompare(propName(b.propertyId))
     );
-  }, [taxRecords, paymentMap, properties]);
+  }, [hoaRecords, paymentMap, properties]);
 
-  const taxYears = useMemo(() => [...new Set(entries.map(e => e.taxYear))].sort((a, b) => b - a), [entries]);
+  function dueKey(e) { return e.dueDate || '9999-12-31'; }
 
-  const filtered = entries
-    .filter(e => !filterProperty || e.propertyId === filterProperty)
-    .filter(e => filterStatus === 'All' || e.status === filterStatus)
-    .filter(e => !filterYear || String(e.taxYear) === filterYear)
-    .filter(e => !filterType || e.taxType === filterType);
-
-  const totalObligations = entries.reduce((s, e) => s + Number(e.annualAmount || 0), 0);
-  const totalPaid        = entries.reduce((s, e) => s + e.amountPaid, 0);
-  // Only count as overdue if the due date has actually passed
-  const totalUnpaid = entries
-    .filter(e => e.status === 'Unpaid' || e.status === 'Partial')
-    .filter(e => e.dueDate && e.dueDate < today)
-    .reduce((s, e) => s + Math.max(Number(e.annualAmount || 0) - e.amountPaid, 0), 0);
-
-  // When prior year's taxes are fully paid, auto-create the next year's record
-  // using the paid amount as the estimated obligation
+  // Auto-create next year's record when prior year is paid
   useEffect(() => {
-    const targets = properties.filter(p =>
-      p.name?.includes('Provincial') || p.name?.includes('Park Valley')
-    );
-    if (!targets.length || !entries.length) return;
-
+    if (!entries.length) return;
     const toAdd = [];
 
-    for (const prop of targets) {
-      for (const taxType of ['County', 'MUD']) {
-        const propEntries = entries.filter(e => e.propertyId === prop.id && e.taxType === taxType);
-        // Find most recently paid year with a known obligation amount
-        const paidEntries = propEntries
-          .filter(e => e.status === 'Paid' && e.amountPaid > 0)
-          .sort((a, b) => b.taxYear - a.taxYear);
-        if (!paidEntries.length) continue;
+    for (const prop of properties) {
+      const propEntries = entries.filter(e => e.propertyId === prop.id);
+      const paidEntries = propEntries
+        .filter(e => e.status === 'Paid' && e.amountPaid > 0)
+        .sort((a, b) => b.year - a.year);
+      if (!paidEntries.length) continue;
 
-        const lastPaid = paidEntries[0];
-        const nextYear = lastPaid.taxYear + 1;
+      const lastPaid = paidEntries[0];
+      const nextYear = lastPaid.year + 1;
+      if (propEntries.some(e => e.year === nextYear)) continue;
 
-        const nextExists = propEntries.some(e => e.taxYear === nextYear);
-        if (nextExists) continue;
-
-        toAdd.push({
-          id: crypto.randomUUID(),
-          propertyId: prop.id,
-          taxYear: nextYear,
-          taxType,
-          annualAmount: lastPaid.amountPaid,
-          dueDate: `${nextYear + 1}-01-31`,
-          notes: `Estimated from ${lastPaid.taxYear} actual ($${lastPaid.amountPaid.toLocaleString()})`,
-        });
-      }
+      toAdd.push({
+        id: crypto.randomUUID(),
+        propertyId: prop.id,
+        year: nextYear,
+        annualAmount: lastPaid.amountPaid,
+        dueDate: '',
+        notes: `Estimated from ${lastPaid.year} actual ($${lastPaid.amountPaid.toLocaleString()})`,
+      });
     }
 
     if (!toAdd.length) return;
-
-    setTaxRecords(prev => {
-      const fresh = toAdd.filter(r => !prev.some(p =>
-        p.propertyId === r.propertyId && p.taxYear === r.taxYear && p.taxType === r.taxType
-      ));
+    setHoaRecords(prev => {
+      const fresh = toAdd.filter(r => !prev.some(p => p.propertyId === r.propertyId && p.year === r.year));
       return fresh.length ? [...prev, ...fresh] : prev;
     });
   }, [entries]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const years = useMemo(() => [...new Set(entries.map(e => e.year))].sort((a, b) => a - b), [entries]);
+
+  const filtered = entries
+    .filter(e => !filterProperty || e.propertyId === filterProperty)
+    .filter(e => filterStatus === 'All' || e.status === filterStatus)
+    .filter(e => !filterYear || String(e.year) === filterYear);
+
+  const totalObligations = entries.reduce((s, e) => s + Number(e.annualAmount || 0), 0);
+  const totalPaid        = entries.reduce((s, e) => s + e.amountPaid, 0);
+  const totalOverdue     = entries
+    .filter(e => (e.status === 'Unpaid' || e.status === 'Partial') && e.dueDate && e.dueDate < today)
+    .reduce((s, e) => s + Math.max(Number(e.annualAmount || 0) - e.amountPaid, 0), 0);
+
   const openAdd  = () => { setForm({ ...EMPTY, id: crypto.randomUUID() }); setModal('add'); };
   const openEdit = (e) => {
-    if (e.derived) { setForm({ ...EMPTY, id: crypto.randomUUID(), propertyId: e.propertyId, taxYear: e.taxYear, taxType: e.taxType }); setModal('add'); return; }
-    setForm({ id: e.id, propertyId: e.propertyId, taxYear: e.taxYear, taxType: e.taxType || '', annualAmount: e.annualAmount, dueDate: e.dueDate || '', notes: e.notes || '' });
+    if (e.derived) { setForm({ ...EMPTY, id: crypto.randomUUID(), propertyId: e.propertyId, year: e.year }); setModal('add'); return; }
+    setForm({ id: e.id, propertyId: e.propertyId, year: e.year, annualAmount: e.annualAmount, dueDate: e.dueDate || '', notes: e.notes || '' });
     setModal('edit');
   };
   const save = () => {
-    if (!form.propertyId || !form.taxYear) return;
+    if (!form.propertyId || !form.year) return;
     const record = { ...form, annualAmount: Number(form.annualAmount) || 0 };
-    if (modal === 'add') setTaxRecords(prev => [...prev, record]);
-    else setTaxRecords(prev => prev.map(r => r.id === record.id ? record : r));
+    if (modal === 'add') setHoaRecords(prev => [...prev, record]);
+    else setHoaRecords(prev => prev.map(r => r.id === record.id ? record : r));
     setModal(null);
   };
   const remove = (id) => {
-    if (confirm('Delete this tax record?')) setTaxRecords(prev => prev.filter(r => r.id !== id));
+    if (confirm('Delete this HOA record?')) setHoaRecords(prev => prev.filter(r => r.id !== id));
   };
 
   const statusBadge = (status) => {
     const cls = status === 'Paid'     ? 'bg-emerald-400/10 text-emerald-400'
               : status === 'Partial'  ? 'bg-blue-400/10 text-blue-400'
               : status === 'Upcoming' ? 'bg-slate-400/10 text-slate-400'
-              :                         'bg-red-400/10 text-red-400'; // Unpaid = overdue
+              :                         'bg-red-400/10 text-red-400';
     return <span className={`text-xs px-2 py-0.5 rounded-full ${cls}`}>{status}</span>;
-  };
-
-  const typeBadge = (t) => {
-    if (!t) return <span className="text-slate-600 text-xs">—</span>;
-    const cls = t === 'County' ? 'bg-blue-400/10 text-blue-400' : 'bg-orange-400/10 text-orange-400';
-    return <span className={`text-xs px-2 py-0.5 rounded-full ${cls}`}>{t}</span>;
   };
 
   return (
     <div className="p-8">
-      {modal && <Modal title={modal === 'add' ? 'Add Tax Record' : 'Edit Tax Record'} form={form} setForm={setForm} onSave={save} onClose={() => setModal(null)} properties={properties} />}
+      {modal && <Modal title={modal === 'add' ? 'Add HOA Record' : 'Edit HOA Record'} form={form} setForm={setForm} onSave={save} onClose={() => setModal(null)} properties={properties} />}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Property Taxes</h1>
+          <h1 className="text-2xl font-bold text-white">HOA Dues</h1>
           <p className="text-slate-400 text-sm mt-1">Obligations and payments across all properties</p>
         </div>
         {canEdit && (
-          <button onClick={openAdd} className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium"><Plus size={16} /> Add Tax Record</button>
+          <button onClick={openAdd} className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium"><Plus size={16} /> Add HOA Record</button>
         )}
       </div>
 
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-navy-800 border border-navy-700 rounded-xl p-4"><div className="text-xs text-slate-400 mb-1">Total Obligations</div><div className="text-xl font-bold text-white">{fmt(totalObligations)}</div></div>
         <div className="bg-navy-800 border border-navy-700 rounded-xl p-4"><div className="text-xs text-slate-400 mb-1">Total Paid</div><div className="text-xl font-bold text-emerald-400">{fmt(totalPaid)}</div></div>
-        <div className="bg-navy-800 border border-navy-700 rounded-xl p-4"><div className="text-xs text-slate-400 mb-1">Outstanding Balance</div><div className="text-xl font-bold text-yellow-400">{fmt(totalUnpaid)}</div></div>
+        <div className="bg-navy-800 border border-navy-700 rounded-xl p-4"><div className="text-xs text-slate-400 mb-1">Outstanding Balance</div><div className="text-xl font-bold text-yellow-400">{fmt(totalOverdue)}</div></div>
       </div>
 
       <div className="flex flex-wrap gap-3 mb-5">
         {['All', 'Upcoming', 'Unpaid', 'Partial', 'Paid'].map(f => (
           <button key={f} onClick={() => setFilterStatus(f)} className={`px-3 py-1.5 rounded-lg text-sm ${filterStatus === f ? 'bg-emerald-500 text-white' : 'bg-navy-800 text-slate-400 hover:text-white border border-navy-700'}`}>{f}</button>
         ))}
-        <select value={filterYear} onChange={e => setFilterYear(e.target.value)} className="bg-navy-800 border border-navy-700 rounded-lg px-3 py-1.5 text-sm text-white">
+        <select value={filterYear} onChange={e => setFilterYear(e.target.value)} className="bg-navy-800 border border-navy-700 rounded-lg px-3 py-1.5 text-sm text-white ml-2">
           <option value="">All Years</option>
-          {taxYears.map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
-        <select value={filterType} onChange={e => setFilterType(e.target.value)} className="bg-navy-800 border border-navy-700 rounded-lg px-3 py-1.5 text-sm text-white">
-          <option value="">All Types</option>
-          {TAX_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          {years.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
       </div>
 
@@ -282,11 +247,11 @@ export default function PropertyTaxes() {
               <th className="text-left px-5 py-3 w-6"></th>
               <th className="text-left px-5 py-3">Property</th>
               <th className="text-left px-5 py-3">Year</th>
-              <th className="text-left px-5 py-3">Type</th>
               <th className="text-right px-5 py-3">Obligation</th>
               <th className="text-right px-5 py-3">Paid</th>
               <th className="text-right px-5 py-3">Balance</th>
               <th className="text-left px-5 py-3">Due Date</th>
+              <th className="text-left px-5 py-3">Last Payment</th>
               <th className="text-left px-5 py-3">Status</th>
               <th className="px-5 py-3"></th>
             </tr>
@@ -307,8 +272,7 @@ export default function PropertyTaxes() {
                       )}
                     </td>
                     <td className="px-5 py-3 text-white font-medium">{propName(e.propertyId)}</td>
-                    <td className="px-5 py-3 text-slate-300">{e.taxYear}</td>
-                    <td className="px-5 py-3">{typeBadge(e.taxType)}</td>
+                    <td className="px-5 py-3 text-slate-300">{e.year}</td>
                     <td className="px-5 py-3 text-right text-slate-400">{e.annualAmount ? fmt(e.annualAmount) : <span className="text-slate-600 italic">not set</span>}</td>
                     <td className="px-5 py-3 text-right text-emerald-400 font-semibold">{e.amountPaid > 0 ? fmt(e.amountPaid) : '—'}</td>
                     <td className="px-5 py-3 text-right">
@@ -317,6 +281,7 @@ export default function PropertyTaxes() {
                         : <span className="text-slate-600">—</span>}
                     </td>
                     <td className="px-5 py-3 text-slate-400">{e.dueDate || '—'}</td>
+                    <td className="px-5 py-3 text-slate-400">{e.lastPaymentDate || '—'}</td>
                     <td className="px-5 py-3">{statusBadge(e.status)}</td>
                     <td className="px-5 py-3">
                       {canEdit && (
@@ -330,7 +295,7 @@ export default function PropertyTaxes() {
                   {isOpen && txList.map((tx, i) => (
                     <tr key={tx.id || i} className="bg-navy-900/60">
                       <td className="pl-5 py-2" />
-                      <td className="px-5 py-2" colSpan={3}>
+                      <td className="px-5 py-2" colSpan={2}>
                         <div className="flex items-center gap-2 text-xs">
                           <div className="w-px h-4 bg-navy-600 ml-1" />
                           <span className="text-slate-500">{tx.date}</span>
@@ -340,13 +305,13 @@ export default function PropertyTaxes() {
                       <td className="px-5 py-2" colSpan={2}>
                         <div className="text-right text-xs text-emerald-400">{fmt(tx.amount)}</div>
                       </td>
-                      <td colSpan={4} />
+                      <td colSpan={5} />
                     </tr>
                   ))}
                 </>
               );
             })}
-            {filtered.length === 0 && <tr><td colSpan={10} className="px-5 py-10 text-center text-slate-500">No tax records found</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={10} className="px-5 py-10 text-center text-slate-500">No HOA records found</td></tr>}
           </tbody>
         </table>
       </div>
