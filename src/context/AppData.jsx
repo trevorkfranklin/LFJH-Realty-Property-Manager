@@ -20,8 +20,9 @@ export function AppDataProvider({ children }) {
   const [hoaDues,      setHoaDues]      = useState([]);
   const [loading,      setLoading]      = useState(true);
 
-  useEffect(() => {
-    Promise.all([
+  const fetchAll = useCallback(() => {
+    setLoading(true);
+    return Promise.all([
       supabase.from('properties').select('*').order('name'),
       supabase.from('tenants').select('*'),
       supabase.from('transactions').select('*').order('date', { ascending: false }),
@@ -38,6 +39,8 @@ export function AppDataProvider({ children }) {
       setLoading(false);
     });
   }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   // ── Properties ──────────────────────────────────────────────────────────────
   const addProperty = useCallback(async (p) => {
@@ -167,7 +170,7 @@ export function AppDataProvider({ children }) {
 
   return (
     <AppDataContext.Provider value={{
-      properties, tenants, transactions, owners, propertyTaxes, hoaDues, loading,
+      properties, tenants, transactions, owners, propertyTaxes, hoaDues, loading, reload: fetchAll,
       addProperty, updateProperty, deleteProperty,
       addTenant, updateTenant, deleteTenant,
       addTransaction, updateTransaction, deleteTransaction, bulkAddTransactions, setTransactionsRaw,

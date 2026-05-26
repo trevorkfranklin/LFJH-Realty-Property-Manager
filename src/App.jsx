@@ -15,6 +15,7 @@ import HOADues from './pages/HOADues';
 import ProjectedCashflow from './pages/ProjectedCashflow';
 import Tenants from './pages/Tenants';
 import Owners from './pages/Owners';
+import MigrateData from './pages/MigrateData';
 
 function AppRoutes() {
   const { session, needsSetup } = useAuth();
@@ -41,6 +42,7 @@ function AppRoutes() {
             <Route path="/users" element={<Users />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/chat" element={<Chat />} />
+            <Route path="/migrate" element={<MigrateData />} />
           </Routes>
         </Layout>
       </BrowserRouter>
