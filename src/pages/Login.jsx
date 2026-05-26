@@ -59,7 +59,7 @@ export default function Login() {
   const { login, createUser, needsSetup } = useAuth();
 
   return (
-    <div className="h-screen bg-navy-900 flex items-center justify-center p-4 overflow-auto">
+    <div className="flex-1 h-screen bg-navy-900 flex items-center justify-center p-4 overflow-auto">
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-3 mb-8">
           <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
