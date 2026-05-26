@@ -11,8 +11,8 @@ const DEFAULT_RULES = [
   { id: 'lease_60', type: 'lease_expiry',  name: 'Lease expiring — 60 days',  active: true,  days: 60, recipientType: 'tenant', subject: 'Lease Renewal Notice — {{propertyName}}', body: 'Dear {{tenantName}},\n\nThis is a friendly reminder that your lease at {{propertyName}} is scheduled to expire on {{leaseEndDate}} ({{daysUntilExpiry}} days from today).\n\nPlease contact us to discuss renewal options.\n\nThank you,\nLFJH (aka LT²D) Realty, LLC' },
   { id: 'lease_30', type: 'lease_expiry',  name: 'Lease expiring — 30 days',  active: true,  days: 30, recipientType: 'tenant', subject: 'Urgent: Lease Ending Soon — {{propertyName}}', body: 'Dear {{tenantName}},\n\nYour lease at {{propertyName}} expires in just {{daysUntilExpiry}} days on {{leaseEndDate}}.\n\nPlease contact us immediately to discuss renewal or move-out arrangements.\n\nThank you,\nLFJH (aka LT²D) Realty, LLC' },
   { id: 'rent_5',   type: 'rent_reminder', name: 'Rent reminder — 5 days',    active: true,  days: 5,  recipientType: 'tenant', subject: 'Rent Reminder — {{propertyName}}', body: 'Dear {{tenantName}},\n\nThis is a reminder that your monthly rent of {{rentAmount}} for {{propertyName}} is due in {{daysUntilDue}} days.\n\nPlease ensure payment is submitted on time.\n\nThank you,\nLFJH (aka LT²D) Realty, LLC' },
-  { id: 'tax_14',   type: 'tax_due',       name: 'Property tax due — 14 days', active: true, days: 14, recipientType: 'user',   subject: 'Property Tax Due — {{propertyName}} ({{taxYear}})', body: 'Reminder: Property tax ({{taxType}}) for {{propertyName}} — Tax Year {{taxYear}} — is due on {{dueDate}}.\n\nBalance: {{balance}}' },
-  { id: 'hoa_14',   type: 'hoa_due',       name: 'HOA dues due — 14 days',    active: true,  days: 14, recipientType: 'user',   subject: 'HOA Dues Due — {{propertyName}} ({{year}})', body: 'Reminder: HOA dues for {{propertyName}} — {{year}} — are due on {{dueDate}}.\n\nBalance: {{balance}}' },
+  { id: 'tax_14',   type: 'tax_due',       name: 'Property tax due — 14 days', active: true, days: 14, recipientType: 'admin',   subject: 'Property Tax Due — {{propertyName}} ({{taxYear}})', body: 'Reminder: Property tax ({{taxType}}) for {{propertyName}} — Tax Year {{taxYear}} — is due on {{dueDate}}.\n\nBalance: {{balance}}' },
+  { id: 'hoa_14',   type: 'hoa_due',       name: 'HOA dues due — 14 days',    active: true,  days: 14, recipientType: 'admin',   subject: 'HOA Dues Due — {{propertyName}} ({{year}})', body: 'Reminder: HOA dues for {{propertyName}} — {{year}} — are due on {{dueDate}}.\n\nBalance: {{balance}}' },
 ];
 
 function fill(template, vars) {
@@ -101,7 +101,8 @@ function RuleModal({ rule, onSave, onClose }) {
             <div><label className="text-xs text-slate-400 block mb-1">Recipient</label>
               <select value={form.recipientType} onChange={e => setForm({...form, recipientType: e.target.value})} className={inputCls}>
                 <option value="tenant">Tenants</option>
-                <option value="user">App users</option>
+                <option value="admin">Admins</option>
+                <option value="viewer">Viewers</option>
               </select>
             </div>
           </div>
@@ -176,9 +177,10 @@ export default function Notifications() {
           const key = `${rule.id}_${r.id}`;
           if (sent.has(key)) continue;
           const pName = propName(r.propertyId);
-          const userEmails = users.filter(u => u.role === 'admin').map(u => u.email).join(', ');
+          const userEmails = users.filter(u => rule.recipientType === 'viewer' ? u.role === 'viewer' : u.role === 'admin').map(u => u.email).join(', ');
+          const recipientName = rule.recipientType === 'viewer' ? 'Viewers' : 'Admins';
           const vars = { propertyName: pName, taxYear: r.taxYear, taxType: r.taxType || '', dueDate: fmtDate(r.dueDate), balance: fmtMoney(r.annualAmount), year: r.taxYear };
-          items.push({ key, ruleId: rule.id, type: rule.type, ruleName: rule.name, recipientEmail: userEmails, recipientName: 'Admin', propertyName: pName, subject: fill(rule.subject, vars), body: fill(rule.body, vars), daysUntil: d, urgent: d <= 7 });
+          items.push({ key, ruleId: rule.id, type: rule.type, ruleName: rule.name, recipientEmail: userEmails, recipientName, propertyName: pName, subject: fill(rule.subject, vars), body: fill(rule.body, vars), daysUntil: d, urgent: d <= 7 });
         }
       } else if (rule.type === 'hoa_due') {
         for (const r of hoa.filter(r => r.dueDate && r.dueDate >= TODAY && r.annualAmount)) {
@@ -187,9 +189,10 @@ export default function Notifications() {
           const key = `${rule.id}_${r.id}`;
           if (sent.has(key)) continue;
           const pName = propName(r.propertyId);
-          const userEmails = users.filter(u => u.role === 'admin').map(u => u.email).join(', ');
+          const userEmails = users.filter(u => rule.recipientType === 'viewer' ? u.role === 'viewer' : u.role === 'admin').map(u => u.email).join(', ');
+          const recipientName = rule.recipientType === 'viewer' ? 'Viewers' : 'Admins';
           const vars = { propertyName: pName, year: r.year, dueDate: fmtDate(r.dueDate), balance: fmtMoney(r.annualAmount) };
-          items.push({ key, ruleId: rule.id, type: rule.type, ruleName: rule.name, recipientEmail: userEmails, recipientName: 'Admin', propertyName: pName, subject: fill(rule.subject, vars), body: fill(rule.body, vars), daysUntil: d, urgent: d <= 7 });
+          items.push({ key, ruleId: rule.id, type: rule.type, ruleName: rule.name, recipientEmail: userEmails, recipientName, propertyName: pName, subject: fill(rule.subject, vars), body: fill(rule.body, vars), daysUntil: d, urgent: d <= 7 });
         }
       }
     }
@@ -323,7 +326,7 @@ export default function Notifications() {
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-white text-sm">{rule.name}</span>
                     <span className="text-xs text-slate-500 bg-navy-700 px-2 py-0.5 rounded">{TYPE_LABEL[rule.type]}</span>
-                    <span className="text-xs text-slate-500">→ {rule.recipientType === 'tenant' ? 'Tenants' : 'Admin users'}</span>
+                    <span className="text-xs text-slate-500">→ {rule.recipientType === 'tenant' ? 'Tenants' : rule.recipientType === 'viewer' ? 'Viewers' : 'Admins'}</span>
                   </div>
                   <div className="text-xs text-slate-500 mt-0.5">{rule.subject}</div>
                 </div>
