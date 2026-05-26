@@ -65,7 +65,7 @@ export default function Login() {
           <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
             <Building2 size={24} className="text-white" />
           </div>
-          <div className="font-bold text-white text-xl leading-tight">LT²D Realty, LLC</div>
+          <div className="font-bold text-white text-xl leading-tight">LFJH (aka LT²D) Realty, LLC</div>
         </div>
 
         <div className="bg-navy-800 rounded-xl border border-navy-700 p-8">

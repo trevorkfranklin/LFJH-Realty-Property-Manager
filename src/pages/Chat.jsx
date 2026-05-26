@@ -107,7 +107,7 @@ function buildContext(properties, tenants, transactions, taxes, hoa, rentcastDat
     return `  • ${prop?.name} | ${h.year} | ${fmtM(h.annualAmount)} due ${h.dueDate || 'unknown'}`;
   }).join('\n');
 
-  return `# LT²D Realty, LLC — Portfolio Data (as of ${today})
+  return `# LFJH (aka LT²D) Realty, LLC — Portfolio Data (as of ${today})
 
 ## Properties (${properties.length} total)
 ${propLines || '  None'}
@@ -156,7 +156,7 @@ export default function Chat() {
     [properties, tenants, transactions, taxes, hoa, rentcastData, sfAccounts]
   );
 
-  const systemPrompt = `You are an expert real estate property management assistant for LT²D Realty, LLC. You have deep knowledge of:
+  const systemPrompt = `You are an expert real estate property management assistant for LFJH (aka LT²D) Realty, LLC. You have deep knowledge of:
 - Real estate investment analysis, cap rates, cash-on-cash returns, NOI
 - Property management best practices
 - Texas property law and landlord/tenant regulations

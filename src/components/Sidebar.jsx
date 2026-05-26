@@ -38,7 +38,7 @@ export default function Sidebar() {
           <Building2 size={22} className="text-white" />
         </div>
         <div>
-          <div className="font-bold text-white text-base leading-tight">LT²D Realty, LLC</div>
+          <div className="font-bold text-white text-base leading-tight">LFJH (aka LT²D) Realty, LLC</div>
         </div>
       </div>
 
