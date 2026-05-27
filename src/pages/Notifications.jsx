@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Bell, Send, X, Plus, Check, Edit2, ToggleLeft, ToggleRight, Clock, AlertTriangle } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Bell, Send, X, Plus, Check, Edit2, ToggleLeft, ToggleRight, Clock, AlertTriangle, Loader } from 'lucide-react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useAppData } from '../context/AppData';
 import { useAuth } from '../context/Auth';
@@ -137,6 +137,15 @@ export default function Notifications() {
   const [customRecipient, setCustomRecipient] = useState('');
   const [customSubject, setCustomSubject]     = useState('');
   const [customBody, setCustomBody]           = useState('');
+  const [gmailConnected, setGmailConnected]   = useState(false);
+  const [sending, setSending]                 = useState(null); // key of item being sent
+
+  useEffect(() => {
+    fetch('/api/gmail/status')
+      .then(r => r.json())
+      .then(d => setGmailConnected(d.connected))
+      .catch(() => {});
+  }, []);
 
   const propName = (id) => properties.find(p => p.id === id)?.name || '—';
   const sent     = useMemo(() => new Set(history.filter(h => h.status !== 'pending').map(h => h.key)), [history]);
@@ -199,22 +208,58 @@ export default function Notifications() {
     return items.sort((a, b) => a.daysUntil - b.daysUntil);
   }, [rules, tenants, properties, taxes, hoa, sent, users]);
 
-  const sendNotif = (item) => {
-    const mailto = `mailto:${encodeURIComponent(item.recipientEmail)}?subject=${encodeURIComponent(item.subject)}&body=${encodeURIComponent(item.body)}`;
-    window.open(mailto);
-    setHistory(prev => [...prev, { ...item, status: 'sent', sentAt: new Date().toISOString() }]);
+  const sendNotif = async (item) => {
+    if (!gmailConnected) {
+      const mailto = `mailto:${encodeURIComponent(item.recipientEmail)}?subject=${encodeURIComponent(item.subject)}&body=${encodeURIComponent(item.body)}`;
+      window.open(mailto);
+      setHistory(prev => [...prev, { ...item, status: 'sent', sentAt: new Date().toISOString() }]);
+      return;
+    }
+    setSending(item.key);
+    try {
+      const res = await fetch('/api/gmail/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: item.recipientEmail, subject: item.subject, body: item.body }),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || res.statusText); }
+      setHistory(prev => [...prev, { ...item, status: 'sent', sentAt: new Date().toISOString() }]);
+    } catch (e) {
+      alert(`Failed to send: ${e.message}`);
+    } finally {
+      setSending(null);
+    }
   };
 
   const dismissNotif = (item) => {
     setHistory(prev => [...prev, { ...item, status: 'dismissed', sentAt: new Date().toISOString() }]);
   };
 
-  const sendCustom = () => {
+  const sendCustom = async () => {
     if (!customRecipient || !customSubject) return;
-    const mailto = `mailto:${encodeURIComponent(customRecipient)}?subject=${encodeURIComponent(customSubject)}&body=${encodeURIComponent(customBody)}`;
-    window.open(mailto);
-    setHistory(prev => [...prev, { key: `custom_${Date.now()}`, type: 'custom', ruleName: 'Custom', recipientEmail: customRecipient, recipientName: customRecipient, subject: customSubject, body: customBody, status: 'sent', sentAt: new Date().toISOString() }]);
-    setCustomRecipient(''); setCustomSubject(''); setCustomBody('');
+    const entry = { key: `custom_${Date.now()}`, type: 'custom', ruleName: 'Custom', recipientEmail: customRecipient, recipientName: customRecipient, subject: customSubject, body: customBody };
+    if (!gmailConnected) {
+      const mailto = `mailto:${encodeURIComponent(customRecipient)}?subject=${encodeURIComponent(customSubject)}&body=${encodeURIComponent(customBody)}`;
+      window.open(mailto);
+      setHistory(prev => [...prev, { ...entry, status: 'sent', sentAt: new Date().toISOString() }]);
+      setCustomRecipient(''); setCustomSubject(''); setCustomBody('');
+      return;
+    }
+    setSending('custom');
+    try {
+      const res = await fetch('/api/gmail/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: customRecipient, subject: customSubject, body: customBody }),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || res.statusText); }
+      setHistory(prev => [...prev, { ...entry, status: 'sent', sentAt: new Date().toISOString() }]);
+      setCustomRecipient(''); setCustomSubject(''); setCustomBody('');
+    } catch (e) {
+      alert(`Failed to send: ${e.message}`);
+    } finally {
+      setSending(null);
+    }
   };
 
   const TYPE_LABEL = { lease_expiry: 'Lease Expiry', rent_reminder: 'Rent Reminder', tax_due: 'Property Tax', hoa_due: 'HOA Dues', custom: 'Custom' };
@@ -273,10 +318,13 @@ export default function Notifications() {
                   <div className="text-xs text-slate-600 mt-2 line-clamp-2 font-mono">{item.body.split('\n')[0]}</div>
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
-                  <button onClick={() => sendNotif(item)} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs rounded-lg font-medium">
-                    <Send size={12} /> Send
+                  <button onClick={() => sendNotif(item)} disabled={sending === item.key}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white text-xs rounded-lg font-medium">
+                    {sending === item.key ? <Loader size={12} className="animate-spin" /> : <Send size={12} />}
+                    {sending === item.key ? 'Sending…' : (gmailConnected ? 'Send' : 'Open Email')}
                   </button>
-                  <button onClick={() => dismissNotif(item)} className="px-3 py-1.5 bg-navy-700 hover:bg-navy-600 text-slate-400 text-xs rounded-lg">
+                  <button onClick={() => dismissNotif(item)} disabled={sending === item.key}
+                    className="px-3 py-1.5 bg-navy-700 hover:bg-navy-600 text-slate-400 text-xs rounded-lg">
                     Dismiss
                   </button>
                 </div>
@@ -302,9 +350,10 @@ export default function Notifications() {
             <label className="text-xs text-slate-400 block mb-1">Body</label>
             <textarea value={customBody} onChange={e => setCustomBody(e.target.value)} rows={8} className={`${inputCls} resize-none`} />
           </div>
-          <button onClick={sendCustom} disabled={!customRecipient || !customSubject}
+          <button onClick={sendCustom} disabled={!customRecipient || !customSubject || sending === 'custom'}
             className="flex items-center gap-2 px-5 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white rounded-lg text-sm font-medium">
-            <Send size={14} /> Open in Email Client
+            {sending === 'custom' ? <Loader size={14} className="animate-spin" /> : <Send size={14} />}
+            {sending === 'custom' ? 'Sending…' : gmailConnected ? 'Send Email' : 'Open in Email Client'}
           </button>
         </div>
       )}

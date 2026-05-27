@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Plus, Trash2, Key, Shield, Eye, X, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Trash2, Key, Shield, Eye, X, Check, Mail, CheckCircle, AlertCircle } from 'lucide-react';
+import { useSearchParams } from 'react-router';
 import { useAuth } from '../context/Auth';
 
 function AddUserModal({ onClose }) {
@@ -94,8 +95,31 @@ function ChangePasswordModal({ onClose }) {
 
 export default function Users() {
   const { session, profile, profiles, updateRole, deleteUser, isAdmin } = useAuth();
-  const [showAdd, setShowAdd]       = useState(false);
+  const [showAdd, setShowAdd]             = useState(false);
   const [showChangePwd, setShowChangePwd] = useState(false);
+  const [searchParams, setSearchParams]   = useSearchParams();
+  const [gmailStatus, setGmailStatus]     = useState(null);
+  const [gmailBanner, setGmailBanner]     = useState(searchParams.get('gmail')); // 'connected' | 'error' | null
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('gmail')) setSearchParams({}, { replace: true });
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/gmail/status')
+      .then(r => r.json())
+      .then(setGmailStatus)
+      .catch(() => setGmailStatus({ connected: false, email: null }));
+  }, []);
+
+  const disconnect = async () => {
+    if (!confirm('Disconnect lt2drealty@gmail.com? Email notifications will fall back to mailto links.')) return;
+    setDisconnecting(true);
+    await fetch('/api/gmail/disconnect', { method: 'POST' });
+    setGmailStatus({ connected: false, email: null });
+    setDisconnecting(false);
+  };
 
   if (!isAdmin) return (
     <div className="p-8 text-center text-slate-500 pt-24">
@@ -126,6 +150,52 @@ export default function Users() {
           <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
             <Plus size={16} /> Add User
           </button>
+        </div>
+      </div>
+
+      {/* Gmail banner */}
+      {gmailBanner === 'connected' && (
+        <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm px-4 py-3 rounded-xl mb-6">
+          <CheckCircle size={16} /> Gmail connected successfully — emails will now send via lt2drealty@gmail.com.
+          <button onClick={() => setGmailBanner(null)} className="ml-auto"><X size={14} /></button>
+        </div>
+      )}
+      {gmailBanner === 'error' && (
+        <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 text-red-400 text-sm px-4 py-3 rounded-xl mb-6">
+          <AlertCircle size={16} /> Gmail connection failed. Check your Google Cloud credentials and try again.
+          <button onClick={() => setGmailBanner(null)} className="ml-auto"><X size={14} /></button>
+        </div>
+      )}
+
+      {/* Gmail Integration */}
+      <div className="bg-navy-800 rounded-xl border border-navy-700 p-6 mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Mail size={20} className="text-red-400" />
+            </div>
+            <div>
+              <div className="text-white font-medium text-sm">Gmail Integration</div>
+              <div className="text-slate-400 text-xs mt-0.5">
+                {gmailStatus === null
+                  ? 'Checking status…'
+                  : gmailStatus.connected
+                    ? <span className="flex items-center gap-1.5"><CheckCircle size={12} className="text-emerald-400" /><span className="text-emerald-400">Connected</span> — sending as lt2drealty@gmail.com</span>
+                    : 'Not connected — notifications use mailto links'}
+              </div>
+            </div>
+          </div>
+          {gmailStatus?.connected ? (
+            <button onClick={disconnect} disabled={disconnecting}
+              className="px-4 py-2 bg-navy-700 hover:bg-navy-600 border border-navy-600 text-slate-300 text-sm rounded-lg disabled:opacity-40">
+              {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+            </button>
+          ) : (
+            <a href="/api/gmail/auth"
+              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm rounded-lg font-medium">
+              Connect Gmail
+            </a>
+          )}
         </div>
       </div>
 
