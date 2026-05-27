@@ -5,7 +5,7 @@ import { useAppData } from '../context/AppData';
 import { sortByStreetName } from '../utils/sort';
 
 const FREE_MODELS = [
-  { id: 'deepseek/deepseek-v4-flash:free',                     label: 'DeepSeek V4 Flash' },
+  { id: 'deepseek/deepseek-v4-flash',                          label: 'DeepSeek V4 Flash' },
   { id: 'google/gemma-4-31b-it:free',                          label: 'Google Gemma 4 31B' },
   { id: 'openai/gpt-oss-120b:free',                            label: 'OpenAI GPT-OSS 120B' },
   { id: 'openai/gpt-oss-20b:free',                             label: 'OpenAI GPT-OSS 20B' },
@@ -356,7 +356,7 @@ Guidelines:
             <Send size={16} />
           </button>
         </div>
-        <p className="text-xs text-slate-600 text-center mt-2">Using {FREE_MODELS.find(m => m.id === model)?.label} via OpenRouter (free tier)</p>
+        <p className="text-xs text-slate-600 text-center mt-2">Using {FREE_MODELS.find(m => m.id === model)?.label} via OpenRouter</p>
       </div>
     </div>
   );
