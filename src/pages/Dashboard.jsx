@@ -34,7 +34,7 @@ function StatCard({ icon: Icon, label, value, sub, color = 'emerald' }) {
 export default function Dashboard() {
   const { properties, tenants, transactions, propertyTaxes } = useAppData();
   const [rentcastData]  = useLocalStorage('lfjh_rentcast', {});
-  const [sfAccounts]    = useLocalStorage('lfjh_simplefin_accounts', {});
+  const [sfAccounts]    = useLocalStorage('lfjh_simplefin_accounts_v2', {});
 
   const { filterProperty } = usePropertyFilter();
   const currentYear = new Date().getFullYear();

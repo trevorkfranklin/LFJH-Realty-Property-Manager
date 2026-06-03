@@ -4,7 +4,7 @@ import { fetchAccounts } from '../utils/simplefin';
 
 export function useAutoBalanceSync() {
   const [sfAccessUrl]                = useLocalStorage('lfjh_simplefin_url', '');
-  const [, setSfAccounts]            = useLocalStorage('lfjh_simplefin_accounts', {});
+  const [, setSfAccounts]            = useLocalStorage('lfjh_simplefin_accounts_v2', {});
   const [lastSync, setLastSync]      = useLocalStorage('lfjh_balance_sync_date', '');
 
   useEffect(() => {
@@ -20,8 +20,7 @@ export function useAutoBalanceSync() {
 
     async function runSync() {
       try {
-        const allAccounts = await fetchAccounts(sfAccessUrl, 1);
-        const accounts = allAccounts.filter(a => a.org?.name?.toLowerCase().includes('chase'));
+        const accounts = await fetchAccounts(sfAccessUrl, 30);
         const map = {};
         for (const acct of accounts) {
           map[acct.id] = {
@@ -32,8 +31,10 @@ export function useAutoBalanceSync() {
             fetchedAt:   today.toISOString().slice(0, 10),
           };
         }
-        setSfAccounts(map);
-        setLastSync(today.toISOString().slice(0, 10));
+        if (Object.keys(map).length > 0) {
+          setSfAccounts(map);
+          setLastSync(today.toISOString().slice(0, 10));
+        }
       } catch { /* non-fatal */ }
     }
   }, [sfAccessUrl]); // eslint-disable-line react-hooks/exhaustive-deps

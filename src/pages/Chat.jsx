@@ -134,7 +134,7 @@ ${hoaLines || '  None'}`;
 export default function Chat() {
   const { properties, tenants, transactions, propertyTaxes: taxes, hoaDues: hoa } = useAppData();
   const [rentcastData] = useLocalStorage('lfjh_rentcast',          {});
-  const [sfAccounts]   = useLocalStorage('lfjh_simplefin_accounts',{});
+  const [sfAccounts]   = useLocalStorage('lfjh_simplefin_accounts_v2',{});
 
   const [model, setModel]       = useState(FREE_MODELS[0].id);
   const [messages, setMessages] = useState([]);

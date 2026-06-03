@@ -5,7 +5,7 @@ import { useAppData } from '../context/AppData';
 export function useEquitySnapshot() {
   const { properties } = useAppData();
   const [rentcastData] = useLocalStorage('lfjh_rentcast', {});
-  const [sfAccounts]   = useLocalStorage('lfjh_simplefin_accounts', {});
+  const [sfAccounts]   = useLocalStorage('lfjh_simplefin_accounts_v2', {});
   const [, setSnapshots] = useLocalStorage('lfjh_equity_snapshots', {});
 
   useEffect(() => {

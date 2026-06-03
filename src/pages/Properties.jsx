@@ -123,7 +123,7 @@ function Modal({ title, form, setForm, onSave, onClose, sfAccounts }) {
 export default function Properties() {
   const { properties, addProperty, updateProperty, deleteProperty, tenants } = useAppData();
   const [rentcastData, setRentcastData] = useLocalStorage('lfjh_rentcast', {});
-  const [sfAccounts, setSfAccounts]     = useLocalStorage('lfjh_simplefin_accounts', {});
+  const [sfAccounts, setSfAccounts]     = useLocalStorage('lfjh_simplefin_accounts_v2', {});
   const [mortgageSyncDate, setMortgageSyncDate] = useLocalStorage('lfjh_mortgage_sync_date', '');
   const [sfAccessUrl]   = useLocalStorage('lfjh_simplefin_url', '');
   const { filterProperty } = usePropertyFilter();
@@ -181,7 +181,7 @@ export default function Properties() {
     if (!sfAccessUrl) return;
     setBalanceSyncing(true);
     try {
-      const accounts = await fetchAccounts(sfAccessUrl, 1);
+      const accounts = await fetchAccounts(sfAccessUrl, 30);
       const map = {};
       for (const acct of accounts) {
         map[acct.id] = {
@@ -192,8 +192,10 @@ export default function Properties() {
           fetchedAt:   new Date().toISOString().slice(0, 10),
         };
       }
-      setSfAccounts(map);
-      setMortgageSyncDate(new Date().toISOString().slice(0, 10));
+      if (Object.keys(map).length > 0) {
+        setSfAccounts(map);
+        setMortgageSyncDate(new Date().toISOString().slice(0, 10));
+      }
     } catch (e) {
       console.error('Mortgage balance sync failed:', e);
     } finally {

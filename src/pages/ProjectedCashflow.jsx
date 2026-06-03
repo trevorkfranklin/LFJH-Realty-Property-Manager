@@ -57,7 +57,7 @@ function Bar({ income, expense, ownerDraw, taxDue, maxVal, height }) {
 
 export default function ProjectedCashflow() {
   const { transactions, properties, tenants, propertyTaxes: taxRecords, hoaDues: hoaRecords } = useAppData();
-  const [sfAccounts]   = useLocalStorage('lfjh_simplefin_accounts', {});
+  const [sfAccounts]   = useLocalStorage('lfjh_simplefin_accounts_v2', {});
 
   const { filterProperty } = usePropertyFilter();
   const [viewMode, setViewMode] = useState('year');
