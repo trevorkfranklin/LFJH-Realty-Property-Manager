@@ -123,11 +123,11 @@ function Modal({ title, form, setForm, onSave, onClose, sfAccounts }) {
 }
 
 export default function Properties() {
-  const { properties, addProperty, updateProperty, deleteProperty, tenants } = useAppData();
+  const { properties, addProperty, updateProperty, deleteProperty, tenants, settings } = useAppData();
   const [rentcastData, setRentcastData] = useLocalStorage('lfjh_rentcast', {});
   const [sfAccounts, setSfAccounts]     = useLocalStorage('lfjh_simplefin_accounts_v2', {});
   const [mortgageSyncDate, setMortgageSyncDate] = useLocalStorage('lfjh_mortgage_sync_date', '');
-  const [sfAccessUrl]   = useLocalStorage('lfjh_simplefin_url', '');
+  const sfAccessUrl = settings?.simplefin_url || '';
   const { filterProperty } = usePropertyFilter();
   const { canEdit } = useAuth();
   const [modal, setModal]             = useState(null);
