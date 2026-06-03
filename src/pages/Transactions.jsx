@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
-import { Plus, Pencil, Trash2, X, Check, Ban, Split, Download } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { Plus, Pencil, Trash2, X, Check, Ban, Split, Download, Sparkles } from 'lucide-react';
 import { useAppData } from '../context/AppData';
 import { TRANSACTION_CATEGORIES } from '../data/sampleData';
-import { buildPatternMap, suggest, isUncategorized } from '../utils/categorizer';
+import { isUncategorized } from '../utils/categorizer';
 import { sortByStreetName } from '../utils/sort';
 import { usePropertyFilter } from '../context/PropertyFilter';
 import { useAuth } from '../context/Auth';
@@ -312,14 +312,72 @@ export default function Transactions() {
     if (tx) updateTransaction({ ...tx, excluded: !tx.excluded });
   };
 
-  const patternMap = useMemo(() => buildPatternMap(transactions), [transactions]);
+  const [aiSuggestions, setAiSuggestions] = useState({});
+  const [aiLoading, setAiLoading]         = useState(false);
+  const requestedRef                       = useRef(new Set());
+
+  useEffect(() => {
+    const pending = transactions.filter(
+      tx => isUncategorized(tx) && !tx.excluded && !requestedRef.current.has(tx.id)
+    );
+    if (!pending.length) return;
+    pending.forEach(tx => requestedRef.current.add(tx.id));
+
+    const examples = transactions
+      .filter(tx => !isUncategorized(tx) && !tx.excluded)
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 50)
+      .map(tx => ({
+        date: tx.date, type: tx.type, amount: tx.amount,
+        description: tx.description, category: tx.category,
+        propertyId: tx.propertyId || null, ownerId: tx.ownerId || null,
+        rentPeriods: tx.rentPeriods || null, taxYear: tx.taxYear || null,
+        taxType: tx.taxType || null, splits: tx.splits?.length ? tx.splits : null,
+      }));
+
+    setAiLoading(true);
+    fetch('/api/ai-categorize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        uncategorized: pending.slice(0, 50).map(tx => ({
+          id: tx.id, date: tx.date, type: tx.type,
+          amount: tx.amount, description: tx.description,
+          notes: tx.notes || '',
+        })),
+        examples,
+        properties: properties.map(p => ({ id: p.id, name: p.name })),
+        owners: owners.map(o => ({ id: o.id, name: `${o.firstName} ${o.lastName}` })),
+        categories: TRANSACTION_CATEGORIES,
+      }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data?.suggestions) return;
+        const map = {};
+        for (const s of data.suggestions) map[s.id] = s;
+        setAiSuggestions(prev => ({ ...prev, ...map }));
+      })
+      .catch(() => {})
+      .finally(() => setAiLoading(false));
+  }, [transactions]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const applySuggestion = (id) => {
     const tx = transactions.find(t => t.id === id);
-    if (!tx) return;
-    const hit = suggest(tx.description, patternMap);
-    if (!hit) return;
-    updateTransaction({ ...tx, category: hit.category, propertyId: hit.propertyId || tx.propertyId, categorized: true });
+    const s  = aiSuggestions[id];
+    if (!tx || !s) return;
+    updateTransaction({
+      ...tx,
+      category:     s.category,
+      propertyId:   s.splits?.length ? '' : (s.propertyId || tx.propertyId || ''),
+      splits:       s.splits || [],
+      ownerId:      s.ownerId || tx.ownerId || '',
+      rentPeriods:  s.rentPeriods || tx.rentPeriods || [],
+      taxYear:      s.taxYear ?? tx.taxYear ?? null,
+      taxType:      s.taxType  || tx.taxType  || '',
+      categorized:  true,
+    });
+    setAiSuggestions(prev => { const n = { ...prev }; delete n[id]; return n; });
   };
 
   const openAdd = () => { setForm({ ...EMPTY, id: crypto.randomUUID() }); setModal('add'); };
@@ -381,6 +439,11 @@ export default function Transactions() {
       <div className="flex items-center justify-between mb-6">
         <div><h1 className="text-2xl font-bold text-white">Transactions</h1><p className="text-slate-400 text-sm mt-1">Track all income and expenses</p></div>
         <div className="flex items-center gap-2">
+          {aiLoading && (
+            <span className="flex items-center gap-1.5 text-xs text-amber-400/80 animate-pulse">
+              <Sparkles size={12} /> AI analyzing…
+            </span>
+          )}
           <button onClick={exportCSV} className="flex items-center gap-2 bg-navy-700 hover:bg-navy-600 border border-navy-600 text-slate-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium">
             <Download size={14} /> Export CSV
           </button>
@@ -454,44 +517,60 @@ export default function Transactions() {
           </thead>
           <tbody className="divide-y divide-navy-700">
             {filtered.map(tx => {
-              const hit = !tx.splits?.length && isUncategorized(tx) ? suggest(tx.description, patternMap) : null;
+              const ai = isUncategorized(tx) && !tx.excluded ? aiSuggestions[tx.id] : null;
               const sd = splitDisplay(tx);
               return (
                 <tr key={tx.id} className={`transition-colors ${tx.excluded ? 'opacity-40' : ''} ${!tx.excluded && isUncategorized(tx) ? 'bg-yellow-500/15 hover:bg-yellow-500/25' : 'hover:bg-navy-700/40'}`}>
                   <td className="px-5 py-3 text-slate-300">{tx.date}</td>
                   <td className="px-5 py-3 text-white">
                     <div>{tx.description}{tx.excluded && <span className="ml-2 text-xs text-slate-500 italic">excluded</span>}</div>
-                    {tx.category === 'Rent' && tx.rentPeriods?.length > 0 && (
+                    {/* confirmed details */}
+                    {!ai && tx.category === 'Rent' && tx.rentPeriods?.length > 0 && (
                       <div className="text-xs text-slate-500 mt-0.5">{rentPeriodsLabel(tx.rentPeriods)}</div>
                     )}
-                    {tx.category === 'Property Tax' && tx.taxYear && (
+                    {!ai && tx.category === 'Property Tax' && tx.taxYear && (
                       <div className="text-xs text-slate-500 mt-0.5">Tax year {tx.taxYear}{tx.taxType ? ` — ${tx.taxType}` : ''}</div>
                     )}
-                    {tx.category === 'Owner Draw' && (() => {
+                    {!ai && tx.category === 'Owner Draw' && (() => {
                       const o = owners.find(o => o.id === tx.ownerId);
                       return o
                         ? <div className="text-xs text-purple-400 mt-0.5">{o.firstName} {o.lastName}</div>
                         : <div className="text-xs text-yellow-500 mt-0.5 italic">Unassigned</div>;
                     })()}
+                    {/* AI suggestion sub-labels */}
+                    {ai?.category === 'Rent' && ai.rentPeriods?.length > 0 && (
+                      <div className="text-xs text-amber-500/80 mt-0.5">Rent period: {ai.rentPeriods.map(p => fmtPeriod(p)).join(', ')}</div>
+                    )}
+                    {ai?.category === 'Property Tax' && ai.taxYear && (
+                      <div className="text-xs text-amber-500/80 mt-0.5">Tax year {ai.taxYear}{ai.taxType ? ` — ${ai.taxType}` : ''}</div>
+                    )}
+                    {ai?.category === 'Owner Draw' && ai.ownerId && (() => {
+                      const o = owners.find(o => o.id === ai.ownerId);
+                      return o ? <div className="text-xs text-amber-500/80 mt-0.5">{o.firstName} {o.lastName}</div> : null;
+                    })()}
                   </td>
                   <td className="px-5 py-3">
-                    {hit
-                      ? <span className="text-amber-400 italic text-xs" title="Suggested — click ✓ to confirm">{hit.category}</span>
+                    {ai
+                      ? <span className="flex items-center gap-1 text-amber-400 italic text-xs" title={`AI suggestion (${ai.confidence}) — click ✓ to confirm`}>
+                          <Sparkles size={10} />{ai.category}
+                        </span>
                       : <span className="text-slate-400">{tx.category || '—'}</span>}
                   </td>
                   <td className="px-5 py-3">
                     {sd
                       ? <span className="flex items-center gap-1 text-slate-400"><Split size={11} className="text-slate-500" />{sd}</span>
-                      : hit?.propertyId && !tx.propertyId
-                        ? <span className="text-amber-400 italic text-xs" title="Suggested — click ✓ to confirm">{propName(hit.propertyId)}</span>
-                        : <span className="text-slate-400">{propName(tx.propertyId)}</span>}
+                      : ai?.splits?.length
+                        ? <span className="text-amber-400 italic text-xs" title="AI suggestion — click ✓ to confirm"><Split size={10} className="inline mr-1" />Split ({ai.splits.length})</span>
+                        : ai?.propertyId
+                          ? <span className="text-amber-400 italic text-xs" title="AI suggestion — click ✓ to confirm">{propName(ai.propertyId)}</span>
+                          : <span className="text-slate-400">{propName(tx.propertyId)}</span>}
                   </td>
                   <td className={`px-5 py-3 text-right font-semibold ${tx.excluded ? 'line-through text-slate-500' : tx.type === 'Income' ? 'text-emerald-400' : 'text-red-400'}`}>
                     {tx.type === 'Income' ? '+' : '-'}{fmtAmt(tx.amount)}
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-end gap-2">
-                      {canEdit && hit && <button onClick={() => applySuggestion(tx.id)} title="Confirm suggestion" className="text-amber-400 hover:text-emerald-400"><Check size={13} /></button>}
+                      {canEdit && ai && <button onClick={() => applySuggestion(tx.id)} title={`Confirm AI suggestion (${ai.confidence} confidence)`} className="text-amber-400 hover:text-emerald-400"><Check size={13} /></button>}
                       {canEdit && <button onClick={() => toggleExclude(tx.id)} title={tx.excluded ? 'Re-include' : 'Exclude'} className={`${tx.excluded ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-orange-400'}`}><Ban size={14} /></button>}
                       {canEdit && <button onClick={() => openEdit(tx)} className="text-slate-400 hover:text-white"><Pencil size={14} /></button>}
                       {canEdit && <button onClick={() => remove(tx.id)} className="text-slate-400 hover:text-red-400"><Trash2 size={14} /></button>}
