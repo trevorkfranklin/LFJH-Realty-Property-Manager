@@ -1,14 +1,10 @@
-export async function fetchAccounts(accessUrl, daysBack = 1) {
-  const u    = new URL(accessUrl);
-  const auth = btoa(`${u.username}:${u.password}`);
-  const base = `${u.protocol}//${u.host}${u.pathname}`;
-  const since = new Date();
-  since.setDate(since.getDate() - daysBack);
-  const startTs = Math.floor(since.getTime() / 1000);
-  const res = await fetch(`${base}/accounts?start-date=${startTs}`, {
-    headers: { Authorization: `Basic ${auth}` },
+export async function fetchAccounts(accessUrl, daysBack = 30) {
+  const res = await fetch('/api/simplefin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ accessUrl, daysBack }),
   });
-  if (!res.ok) throw new Error(`SimpleFIN API error (${res.status})`);
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Proxy error (${res.status})`);
   return data.accounts || [];
 }

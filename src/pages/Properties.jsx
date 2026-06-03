@@ -135,6 +135,7 @@ export default function Properties() {
   const [syncing, setSyncing]         = useState(false);
   const [syncingId, setSyncingId]     = useState(null);
   const [balanceSyncing, setBalanceSyncing] = useState(false);
+  const [syncError, setSyncError]           = useState('');
 
   const visibleProperties = sortByStreetName(filterProperty ? properties.filter(p => p.id === filterProperty) : properties);
   const fmt      = (n) => n ? '$' + Number(n).toLocaleString() : '—';
@@ -182,6 +183,7 @@ export default function Properties() {
   const syncMortgageBalances = useCallback(async () => {
     if (!sfAccessUrl) return;
     setBalanceSyncing(true);
+    setSyncError('');
     try {
       const accounts = await fetchAccounts(sfAccessUrl, 30);
       const map = {};
@@ -197,9 +199,11 @@ export default function Properties() {
       if (Object.keys(map).length > 0) {
         setSfAccounts(map);
         setMortgageSyncDate(new Date().toISOString().slice(0, 10));
+      } else {
+        setSyncError('Sync returned 0 accounts — check your SimpleFIN URL or connection.');
       }
     } catch (e) {
-      console.error('Mortgage balance sync failed:', e);
+      setSyncError(e.message || 'Sync failed');
     } finally {
       setBalanceSyncing(false);
     }
@@ -242,6 +246,7 @@ export default function Properties() {
           <p className="text-slate-400 text-sm mt-1">{visibleProperties.length} propert{visibleProperties.length !== 1 ? 'ies' : 'y'} · {fmt(totalMonthlyRent)}/mo gross rent</p>
         </div>
         <div className="flex items-center gap-2">
+          {syncError && <span className="text-xs text-red-400 max-w-xs truncate" title={syncError}>{syncError}</span>}
           {canEdit && sfAccessUrl && (
             <button onClick={syncMortgageBalances} disabled={balanceSyncing} className="flex items-center gap-2 bg-navy-700 hover:bg-navy-600 border border-navy-600 text-slate-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50">
               <RefreshCw size={14} className={balanceSyncing ? 'animate-spin' : ''} />
