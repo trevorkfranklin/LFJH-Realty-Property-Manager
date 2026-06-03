@@ -99,17 +99,19 @@ function Modal({ title, form, setForm, onSave, onClose, sfAccounts }) {
           <div><label className="text-xs text-slate-400 block mb-1">MUD District</label><input value={form.mudDistrict || ''} onChange={e => setForm({ ...form, mudDistrict: e.target.value })} placeholder="e.g. Fort Bend MUD #23" className={inputCls} /></div>
           <div><label className="text-xs text-slate-400 block mb-1">MUD Website</label><input type="url" value={form.mudUrl || ''} onChange={e => setForm({ ...form, mudUrl: e.target.value })} placeholder="https://..." className={inputCls} /></div>
           <div className="col-span-2"><label className="text-xs text-slate-400 block mb-1">Notes</label><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} className={`${inputCls} resize-none`} /></div>
-          {accountOptions.length > 0 && (
-            <div className="col-span-2">
-              <label className="text-xs text-slate-400 block mb-1">Mortgage Account (SimpleFIN)</label>
+          <div className="col-span-2">
+            <label className="text-xs text-slate-400 block mb-1">Mortgage Account (SimpleFIN)</label>
+            {accountOptions.length > 0 ? (
               <select value={form.mortgageAccountId || ''} onChange={e => setForm({ ...form, mortgageAccountId: e.target.value })} className={inputCls}>
                 <option value="">— None —</option>
                 {accountOptions.map(a => (
                   <option key={a.id} value={a.id}>{a.orgName} — {a.accountName}</option>
                 ))}
               </select>
-            </div>
-          )}
+            ) : (
+              <div className={`${inputCls} text-slate-500 italic`}>No accounts synced — click Sync Balances first</div>
+            )}
+          </div>
         </div>
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-navy-700">
           <button onClick={onClose} className="px-4 py-2 text-sm text-slate-400 hover:text-white">Cancel</button>
@@ -310,23 +312,21 @@ export default function Properties() {
               {p.notes && <div className="text-xs text-slate-500 italic mb-3">{p.notes}</div>}
 
               {/* Mortgage balance */}
-              {(mortgageAcct || Object.keys(sfAccounts).length > 0) && (
-                <div className="border-t border-navy-700 pt-3 mb-3">
-                  <div className="flex items-center gap-1 mb-2">
-                    <Landmark size={11} className="text-slate-500" />
-                    <span className="text-xs text-slate-500">Mortgage Balance</span>
-                  </div>
-                  {mortgageAcct ? (
-                    <div className="bg-navy-900 rounded-lg p-2 text-xs">
-                      <div className="text-slate-500 mb-1">{mortgageAcct.orgName} — {mortgageAcct.accountName}</div>
-                      <div className="text-white font-semibold">{fmt(mortgageAcct.balance)}</div>
-                      <div className="text-slate-600 mt-0.5">as of {mortgageAcct.fetchedAt}</div>
-                    </div>
-                  ) : (
-                    <div className="text-xs text-slate-600 italic">No account linked — click Edit to link one</div>
-                  )}
+              <div className="border-t border-navy-700 pt-3 mb-3">
+                <div className="flex items-center gap-1 mb-2">
+                  <Landmark size={11} className="text-slate-500" />
+                  <span className="text-xs text-slate-500">Mortgage Balance</span>
                 </div>
-              )}
+                {mortgageAcct ? (
+                  <div className="bg-navy-900 rounded-lg p-2 text-xs">
+                    <div className="text-slate-500 mb-1">{mortgageAcct.orgName} — {mortgageAcct.accountName}</div>
+                    <div className="text-white font-semibold">{fmt(mortgageAcct.balance)}</div>
+                    <div className="text-slate-600 mt-0.5">as of {mortgageAcct.fetchedAt}</div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-600 italic">No account linked — click Edit to link one</div>
+                )}
+              </div>
 
               {/* RentCast estimates */}
               <div className="border-t border-navy-700 pt-3 mb-3">
