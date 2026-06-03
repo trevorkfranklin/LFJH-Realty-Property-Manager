@@ -9,6 +9,104 @@ import { useAuth } from '../context/Auth';
 
 const EMPTY = { id: '', date: new Date().toISOString().slice(0, 10), description: '', amount: '', type: 'Expense', category: '', propertyId: '', ownerId: '', notes: '', splits: [], rentPeriods: [], taxYear: null, taxType: '' };
 
+function TxTooltip({ tx, pos, properties, owners }) {
+  if (!tx) return null;
+
+  const isSplit   = tx.splits?.length > 0;
+  const propName  = (id) => properties.find(p => p.id === id)?.name || id;
+  const ownerName = (id) => { const o = owners.find(o => o.id === id); return o ? `${o.firstName} ${o.lastName}` : null; };
+  const sfAccount = tx.notes?.startsWith('SimpleFIN — ') ? tx.notes.slice('SimpleFIN — '.length) : null;
+  const userNotes = !sfAccount && tx.notes ? tx.notes : null;
+
+  const left = pos.x + 20 + 300 > window.innerWidth ? pos.x - 316 : pos.x + 16;
+  const top  = Math.min(pos.y - 8, window.innerHeight - 320);
+
+  return (
+    <div
+      style={{ position: 'fixed', left, top, zIndex: 9999, pointerEvents: 'none', width: 300 }}
+      className="bg-navy-800 border border-navy-600 rounded-xl shadow-2xl p-4 text-xs"
+    >
+      {/* Header */}
+      <div className="font-medium text-white text-sm mb-3 leading-snug">{tx.description}</div>
+
+      <div className="space-y-2">
+        {/* Type + Amount */}
+        <Row label="Amount">
+          <span className={tx.type === 'Income' ? 'text-emerald-400 font-semibold' : 'text-red-400 font-semibold'}>
+            {tx.type === 'Income' ? '+' : '-'}{fmtAmt(tx.amount)}
+          </span>
+          <span className="text-slate-500 ml-1">({tx.type})</span>
+        </Row>
+
+        {/* Category */}
+        {tx.category && <Row label="Category"><span className="text-slate-200">{tx.category}</span></Row>}
+
+        {/* Property / Splits */}
+        {isSplit ? (
+          <div>
+            <div className="text-slate-500 mb-1">Split across:</div>
+            {tx.splits.map(sp => {
+              const portion = Number(tx.amount) * sp.percentage / 100;
+              return (
+                <div key={sp.propertyId} className="flex justify-between items-center py-0.5">
+                  <span className="text-slate-300 truncate mr-2">{propName(sp.propertyId)}</span>
+                  <span className="text-slate-400 shrink-0">{sp.percentage}% · {fmtAmt(portion)}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : tx.propertyId ? (
+          <Row label="Property"><span className="text-slate-200">{propName(tx.propertyId)}</span></Row>
+        ) : (
+          <Row label="Property"><span className="text-slate-500 italic">General / All</span></Row>
+        )}
+
+        {/* Rent periods */}
+        {tx.category === 'Rent' && tx.rentPeriods?.length > 0 && (
+          <Row label="Rent for">
+            <span className="text-slate-200">{tx.rentPeriods.map(p => fmtPeriod(p)).join(', ')}</span>
+          </Row>
+        )}
+
+        {/* Property Tax */}
+        {tx.category === 'Property Tax' && (
+          <>
+            {tx.taxYear && <Row label="Tax year"><span className="text-slate-200">{tx.taxYear}</span></Row>}
+            {tx.taxType && <Row label="Tax type"><span className="text-slate-200">{tx.taxType}</span></Row>}
+          </>
+        )}
+
+        {/* Owner Draw */}
+        {tx.category === 'Owner Draw' && tx.ownerId && (
+          <Row label="Owner">
+            <span className="text-purple-400">{ownerName(tx.ownerId) || tx.ownerId}</span>
+          </Row>
+        )}
+
+        {/* SimpleFIN account */}
+        {sfAccount && <Row label="Account"><span className="text-slate-400">{sfAccount}</span></Row>}
+
+        {/* Notes */}
+        {userNotes && <Row label="Notes"><span className="text-slate-400 italic">{userNotes}</span></Row>}
+
+        {/* Excluded */}
+        {tx.excluded && (
+          <div className="mt-2 pt-2 border-t border-navy-700 text-orange-400">Excluded from reports</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, children }) {
+  return (
+    <div className="flex items-start gap-2">
+      <span className="text-slate-500 w-20 shrink-0">{label}</span>
+      <span className="flex-1 min-w-0">{children}</span>
+    </div>
+  );
+}
+
 function fmtPeriod(ym) {
   const [y, m] = ym.split('-');
   return new Date(Number(y), Number(m) - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
@@ -315,6 +413,8 @@ export default function Transactions() {
   const [aiSuggestions, setAiSuggestions] = useState({});
   const [aiLoading, setAiLoading]         = useState(false);
   const requestedRef                       = useRef(new Set());
+  const [hoveredTx, setHoveredTx]         = useState(null);
+  const [tooltipPos, setTooltipPos]       = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     const pending = transactions.filter(
@@ -430,6 +530,7 @@ export default function Transactions() {
 
   return (
     <div className="p-4 md:p-8">
+      <TxTooltip tx={hoveredTx} pos={tooltipPos} properties={properties} owners={owners} />
       {modal && (
         <SplitModal
           title={modal === 'add' ? 'Add Transaction' : 'Edit Transaction'}
@@ -520,7 +621,13 @@ export default function Transactions() {
               const ai = isUncategorized(tx) && !tx.excluded ? aiSuggestions[tx.id] : null;
               const sd = splitDisplay(tx);
               return (
-                <tr key={tx.id} className={`transition-colors ${tx.excluded ? 'opacity-40' : ''} ${!tx.excluded && isUncategorized(tx) ? 'bg-yellow-500/15 hover:bg-yellow-500/25' : 'hover:bg-navy-700/40'}`}>
+                <tr
+                  key={tx.id}
+                  className={`transition-colors cursor-default ${tx.excluded ? 'opacity-40' : ''} ${!tx.excluded && isUncategorized(tx) ? 'bg-yellow-500/15 hover:bg-yellow-500/25' : 'hover:bg-navy-700/40'}`}
+                  onMouseEnter={(e) => { setHoveredTx(tx); setTooltipPos({ x: e.clientX, y: e.clientY }); }}
+                  onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
+                  onMouseLeave={() => setHoveredTx(null)}
+                >
                   <td className="px-5 py-3 text-slate-300">{tx.date}</td>
                   <td className="px-5 py-3 text-white">
                     <div>{tx.description}{tx.excluded && <span className="ml-2 text-xs text-slate-500 italic">excluded</span>}</div>
