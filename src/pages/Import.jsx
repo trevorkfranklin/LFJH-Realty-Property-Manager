@@ -163,15 +163,6 @@ export default function Import() {
     setFixCount(fixed);
   };
 
-  const [removeCount, setRemoveCount] = useState(null);
-  const csvImported = transactions.filter(tx => tx.notes === 'Imported from CSV');
-  const removeCsvImports = () => {
-    if (!csvImported.length) { setRemoveCount(0); return; }
-    if (!confirm(`Delete all ${csvImported.length} CSV-imported transactions? You can re-import the files to replace them.`)) return;
-    csvImported.forEach(tx => deleteTransaction(tx.id));
-    setRemoveCount(csvImported.length);
-  };
-
   // ── SimpleFIN state ────────────────────────────────────────────────────────
   const sfAccessUrl = settings?.simplefin_url || '';
   const setSfAccessUrl = (url) => saveSetting('simplefin_url', url);
@@ -182,6 +173,12 @@ export default function Import() {
   const [sfSyncing, setSfSyncing] = useState(false);
   const [sfError, setSfError] = useState('');
   const [sfAccounts, setSfAccounts] = useState([]);
+  const [sfAllAccounts, setSfAllAccounts] = useState([]);
+  const [sfExcludedIds, setSfExcludedIds] = useState(new Set());
+  useEffect(() => {
+    try { setSfExcludedIds(new Set(JSON.parse(settings?.simplefin_excluded_ids || '[]'))); }
+    catch { setSfExcludedIds(new Set()); }
+  }, [settings?.simplefin_excluded_ids]);
   const [sfPreview, setSfPreview] = useState([]);
   const [sfStartDate, setSfStartDate] = useState(() => {
     const d = new Date();
@@ -220,9 +217,14 @@ export default function Import() {
       });
       if (!res.ok) throw new Error(`API error (${res.status})`);
       const data = await res.json();
-      const accounts = (data.accounts || []).filter(a => a.org?.name?.toLowerCase().includes('chase'));
-      setSfAccounts(accounts);
-      const txs = accounts.flatMap(acct =>
+      const EXCLUDED_ACCOUNT_SUFFIXES = ['6663', '5100', '9533'];
+      const allChase = (data.accounts || [])
+        .filter(a => a.org?.name?.toLowerCase().includes('chase'))
+        .filter(a => !EXCLUDED_ACCOUNT_SUFFIXES.some(suffix => (a.name || a.id || '').includes(suffix)));
+      setSfAllAccounts(allChase);
+      const activeAccounts = allChase.filter(a => !sfExcludedIds.has(a.id));
+      setSfAccounts(activeAccounts);
+      const txs = activeAccounts.flatMap(acct =>
         (acct.transactions || []).map((tx, i) => {
           const amount = parseFloat(tx.amount);
           return {
@@ -262,10 +264,19 @@ export default function Import() {
     setSfStep('done');
   }
 
+  async function toggleAccountExclusion(accountId, include) {
+    const next = new Set(sfExcludedIds);
+    if (include) next.delete(accountId);
+    else next.add(accountId);
+    setSfExcludedIds(next);
+    await saveSetting('simplefin_excluded_ids', JSON.stringify([...next]));
+  }
+
   async function sfDisconnect() {
     await setSfAccessUrl('');
     setSfStep('connect');
     setSfAccounts([]);
+    setSfAllAccounts([]);
     setSfPreview([]);
     setSfError('');
     setSfToken('');
@@ -364,6 +375,30 @@ export default function Import() {
                   </select>
                 </div>
               </div>
+              {sfAllAccounts.length > 0 && (
+                <div>
+                  <label className="text-xs text-slate-400 block mb-2">Chase accounts to include</label>
+                  <div className="space-y-1.5">
+                    {sfAllAccounts.map(acct => {
+                      const included = !sfExcludedIds.has(acct.id);
+                      return (
+                        <button
+                          key={acct.id}
+                          onClick={() => toggleAccountExclusion(acct.id, !included)}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-colors ${
+                            included
+                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
+                              : 'bg-navy-900 border-navy-700 text-slate-500 hover:border-navy-600'
+                          }`}
+                        >
+                          <span className={included ? '' : 'line-through'}>{acct.name}</span>
+                          <span className="text-xs shrink-0 ml-2">{included ? 'Included' : 'Excluded'}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {sfError && (
                 <div className="flex items-start gap-2 text-red-400 text-sm">
                   <AlertCircle size={14} className="mt-0.5 shrink-0" />{sfError}
@@ -596,26 +631,6 @@ export default function Import() {
           {fixCount !== null && (
             <p className="mt-2 text-sm text-emerald-400 flex items-center gap-1.5">
               <Check size={14} /> {fixCount === 0 ? 'All dates are already correct.' : `Fixed ${fixCount} transaction${fixCount !== 1 ? 's' : ''}.`}
-            </p>
-          )}
-          <div className="flex items-center justify-between p-4 bg-navy-800 border border-navy-700 rounded-xl mt-3">
-            <div>
-              <p className="text-sm text-white">Delete all CSV-imported transactions</p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Removes {csvImported.length} CSV-imported transaction{csvImported.length !== 1 ? 's' : ''} so you can re-import your files cleanly
-              </p>
-            </div>
-            <button
-              onClick={removeCsvImports}
-              disabled={csvImported.length === 0}
-              className="px-4 py-2 bg-navy-700 hover:bg-red-500/20 hover:text-red-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 rounded-lg text-sm font-medium shrink-0 ml-4 transition-colors"
-            >
-              Delete All
-            </button>
-          </div>
-          {removeCount !== null && (
-            <p className="mt-2 text-sm text-emerald-400 flex items-center gap-1.5">
-              <Check size={14} /> {removeCount === 0 ? 'No CSV-imported transactions found.' : `Deleted ${removeCount} transaction${removeCount !== 1 ? 's' : ''}. Re-import your CSV files to replace them.`}
             </p>
           )}
           <div className="flex items-center justify-between p-4 bg-navy-800 border border-navy-700 rounded-xl mt-3">

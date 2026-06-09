@@ -35,7 +35,14 @@ export function useAutoSimpleFINSync() {
       if (!res.ok) throw new Error(`SimpleFIN API error (${res.status})`);
       const data = await res.json();
 
-      const chaseAccounts = (data.accounts || []).filter(a => a.org?.name?.toLowerCase().includes('chase'));
+      const excludedSuffixes = ['6663', '5100', '9533'];
+      let excludedIds = new Set();
+      try { excludedIds = new Set(JSON.parse(settings?.simplefin_excluded_ids || '[]')); } catch {}
+      const chaseAccounts = (data.accounts || []).filter(a =>
+        a.org?.name?.toLowerCase().includes('chase') &&
+        !excludedSuffixes.some(suffix => a.name?.includes(suffix)) &&
+        !excludedIds.has(a.id)
+      );
       const fetched = chaseAccounts.flatMap(acct =>
         (acct.transactions || []).map(tx => {
           const amount = parseFloat(tx.amount);

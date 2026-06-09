@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ArrowLeftRight, Upload, Building2, DollarSign, TrendingUp, Users, Home, LogOut, ShieldCheck, Bell, MessageSquare, UserCheck, HardDriveDownload, X } from 'lucide-react';
+import { LayoutDashboard, ArrowLeftRight, Upload, Building2, DollarSign, TrendingUp, Users, Home, LogOut, ShieldCheck, Bell, MessageSquare, UserCheck, X } from 'lucide-react';
 import { useNotificationCount } from '../pages/Notifications';
 import { useAuth } from '../context/Auth';
 import { useAppData } from '../context/AppData';
@@ -19,7 +19,6 @@ const navItems = [
   { to: '/chat',          label: 'AI Assistant',    icon: MessageSquare },
   { to: '/notifications', label: 'Notifications',   icon: Bell },
   { to: '/users',         label: 'Users',           icon: ShieldCheck, adminOnly: true },
-  { to: '/migrate',      label: 'Migrate Data',    icon: HardDriveDownload, adminOnly: true },
 ];
 
 export default function Sidebar({ mobileOpen, onClose }) {
