@@ -174,6 +174,7 @@ export default function Import() {
   const [sfError, setSfError] = useState('');
   const [sfAccounts, setSfAccounts] = useState([]);
   const [sfAllAccounts, setSfAllAccounts] = useState([]);
+  const [sfAllPreview, setSfAllPreview] = useState([]);
   const [sfExcludedIds, setSfExcludedIds] = useState(new Set());
   useEffect(() => {
     try { setSfExcludedIds(new Set(JSON.parse(settings?.simplefin_excluded_ids || '[]'))); }
@@ -222,14 +223,14 @@ export default function Import() {
         .filter(a => a.org?.name?.toLowerCase().includes('chase'))
         .filter(a => !EXCLUDED_ACCOUNT_SUFFIXES.some(suffix => (a.name || a.id || '').includes(suffix)));
       setSfAllAccounts(allChase);
-      const activeAccounts = allChase.filter(a => !sfExcludedIds.has(a.id));
-      setSfAccounts(activeAccounts);
-      const txs = activeAccounts.flatMap(acct =>
-        (acct.transactions || []).map((tx, i) => {
+      setSfAccounts(allChase.filter(a => !sfExcludedIds.has(a.id)));
+      const allTxs = allChase.flatMap(acct =>
+        (acct.transactions || []).map((tx) => {
           const amount = parseFloat(tx.amount);
           return {
             id: crypto.randomUUID(),
             sfTxId: tx.id,
+            _accountId: acct.id,
             date: new Date(tx.posted * 1000).toISOString().slice(0, 10),
             description: tx.description || tx.memo || 'Bank transaction',
             amount: Math.abs(amount),
@@ -241,7 +242,7 @@ export default function Import() {
         })
       );
       const keys = existingKeys();
-      setSfPreview(txs.map(tx => ({ ...tx, _dupe: isDupe(tx, keys) })));
+      setSfAllPreview(allTxs.map(tx => ({ ...tx, _dupe: isDupe(tx, keys) })));
       setSfStep('preview');
     } catch (e) {
       setSfError(e.message || 'Sync failed. Your connection may have expired — try disconnecting and reconnecting.');
@@ -250,25 +251,12 @@ export default function Import() {
     }
   }
 
-  async function sfImport() {
-    const { sfIds, fullKeys, dateAmtKeys } = buildDedupSets(transactions);
-    const fresh = sfPreview
-      .filter(tx => !tx._dupe)
-      .filter(tx => {
-        if (tx.sfTxId && sfIds.has(tx.sfTxId)) return false;
-        if (fullKeys.has(`${tx.date}|${tx.description}|${Number(tx.amount)}|${tx.type}`)) return false;
-        return !dateAmtKeys.has(`${tx.date}|${Number(tx.amount)}`);
-      })
-      .map(({ _dupe, ...tx }) => tx);
-    await bulkAddTransactions(fresh);
-    setSfStep('done');
-  }
-
   async function toggleAccountExclusion(accountId, include) {
     const next = new Set(sfExcludedIds);
     if (include) next.delete(accountId);
     else next.add(accountId);
     setSfExcludedIds(next);
+    setSfAccounts(sfAllAccounts.filter(a => !next.has(a.id)));
     await saveSetting('simplefin_excluded_ids', JSON.stringify([...next]));
   }
 
@@ -277,6 +265,7 @@ export default function Import() {
     setSfStep('connect');
     setSfAccounts([]);
     setSfAllAccounts([]);
+    setSfAllPreview([]);
     setSfPreview([]);
     setSfError('');
     setSfToken('');
@@ -375,9 +364,31 @@ export default function Import() {
                   </select>
                 </div>
               </div>
+              {sfError && (
+                <div className="flex items-start gap-2 text-red-400 text-sm">
+                  <AlertCircle size={14} className="mt-0.5 shrink-0" />{sfError}
+                </div>
+              )}
+              <button
+                onClick={sfSync}
+                disabled={sfSyncing}
+                className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center gap-2"
+              >
+                <RefreshCw size={14} className={sfSyncing ? 'animate-spin' : ''} />
+                {sfSyncing ? 'Syncing...' : 'Sync Transactions'}
+              </button>
+            </div>
+          )}
+
+          {sfStep === 'preview' && (() => {
+            const sfPreview = sfAllPreview.filter(tx => !sfExcludedIds.has(tx._accountId));
+            const sfFresh = sfPreview.filter(tx => !tx._dupe);
+            const sfDupes = sfPreview.length - sfFresh.length;
+            return (
+            <div className="space-y-4">
               {sfAllAccounts.length > 0 && (
                 <div>
-                  <label className="text-xs text-slate-400 block mb-2">Chase accounts to include</label>
+                  <p className="text-xs text-slate-400 mb-2">Chase accounts to include</p>
                   <div className="space-y-1.5">
                     {sfAllAccounts.map(acct => {
                       const included = !sfExcludedIds.has(acct.id);
@@ -399,27 +410,6 @@ export default function Import() {
                   </div>
                 </div>
               )}
-              {sfError && (
-                <div className="flex items-start gap-2 text-red-400 text-sm">
-                  <AlertCircle size={14} className="mt-0.5 shrink-0" />{sfError}
-                </div>
-              )}
-              <button
-                onClick={sfSync}
-                disabled={sfSyncing}
-                className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center gap-2"
-              >
-                <RefreshCw size={14} className={sfSyncing ? 'animate-spin' : ''} />
-                {sfSyncing ? 'Syncing...' : 'Sync Transactions'}
-              </button>
-            </div>
-          )}
-
-          {sfStep === 'preview' && (() => {
-            const sfFresh = sfPreview.filter(tx => !tx._dupe);
-            const sfDupes = sfPreview.length - sfFresh.length;
-            return (
-            <div className="space-y-4">
               <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-yellow-400 text-sm flex items-center gap-2">
                 <AlertCircle size={14} />
                 {sfFresh.length} new transaction{sfFresh.length !== 1 ? 's' : ''} from {sfAccounts.length} account{sfAccounts.length !== 1 ? 's' : ''}.
@@ -453,7 +443,17 @@ export default function Import() {
               <div className="flex justify-between">
                 <button onClick={() => setSfStep('sync')} className="text-slate-400 hover:text-white text-sm">← Back</button>
                 <button
-                  onClick={sfImport}
+                  onClick={() => {
+                    const { sfIds, fullKeys, dateAmtKeys } = buildDedupSets(transactions);
+                    const fresh = sfFresh
+                      .filter(tx => {
+                        if (tx.sfTxId && sfIds.has(tx.sfTxId)) return false;
+                        if (fullKeys.has(`${tx.date}|${tx.description}|${Number(tx.amount)}|${tx.type}`)) return false;
+                        return !dateAmtKeys.has(`${tx.date}|${Number(tx.amount)}`);
+                      })
+                      .map(({ _dupe, _accountId, ...tx }) => tx);
+                    bulkAddTransactions(fresh).then(() => setSfStep('done'));
+                  }}
                   disabled={sfFresh.length === 0}
                   className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium"
                 >
@@ -470,7 +470,7 @@ export default function Import() {
                 <Check size={32} className="text-emerald-400" />
               </div>
               <h2 className="text-xl font-semibold text-white mb-2">Import Complete!</h2>
-              <p className="text-slate-400 text-sm mb-6">{sfPreview.filter(tx => !tx._dupe).length} transactions added{sfPreview.some(tx => tx._dupe) ? `, ${sfPreview.filter(tx => tx._dupe).length} duplicates skipped` : ''}.</p>
+              <p className="text-slate-400 text-sm mb-6">{sfAllPreview.filter(tx => !sfExcludedIds.has(tx._accountId) && !tx._dupe).length} transactions added.</p>
               <button
                 onClick={() => setSfStep('sync')}
                 className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium"
