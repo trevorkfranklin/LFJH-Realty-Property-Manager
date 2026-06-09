@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Check, AlertCircle, RefreshCw, Landmark } from 'lucide-react';
+import { Upload, Check, AlertCircle, RefreshCw, Landmark, Trash2 } from 'lucide-react';
 import { TRANSACTION_CATEGORIES } from '../data/sampleData';
 import { useAppData } from '../context/AppData';
+import { supabase } from '../lib/supabase';
 import { sortByStreetName } from '../utils/sort';
 
 function parseLine(line) {
@@ -56,7 +57,7 @@ function guessField(row, candidates) {
 const fmt = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function Import() {
-  const { transactions, bulkAddTransactions, updateTransaction, deleteTransaction, properties, settings, saveSetting } = useAppData();
+  const { transactions, bulkAddTransactions, updateTransaction, deleteTransaction, properties, settings, saveSetting, setTransactionsRaw } = useAppData();
   const [mode, setMode] = useState('bank');
 
   // ── CSV state ──────────────────────────────────────────────────────────────
@@ -171,6 +172,8 @@ export default function Import() {
   const [sfToken, setSfToken] = useState('');
   const [sfConnecting, setSfConnecting] = useState(false);
   const [sfSyncing, setSfSyncing] = useState(false);
+  const [sfCleaning, setSfCleaning] = useState(false);
+  const [sfCleanResult, setSfCleanResult] = useState(null);
   const [sfError, setSfError] = useState('');
   const [sfAccounts, setSfAccounts] = useState([]);
   const [sfAllAccounts, setSfAllAccounts] = useState([]);
@@ -269,6 +272,34 @@ export default function Import() {
     setSfPreview([]);
     setSfError('');
     setSfToken('');
+  }
+
+  async function cleanExcludedAccountTxns() {
+    const excludedAccounts = sfAllAccounts.filter(a => sfExcludedIds.has(a.id));
+    if (!excludedAccounts.length) return;
+    setSfCleaning(true);
+    setSfCleanResult(null);
+    try {
+      let deleted = 0;
+      for (const acct of excludedAccounts) {
+        const notePrefix = `SimpleFIN — ${acct.name}`;
+        const { data: rows } = await supabase
+          .from('transactions')
+          .select('id')
+          .like('notes', `${notePrefix}%`);
+        if (rows?.length) {
+          await supabase.from('transactions').delete().in('id', rows.map(r => r.id));
+          deleted += rows.length;
+          setTransactionsRaw(prev => {
+            const ids = new Set(rows.map(r => r.id));
+            return prev.filter(tx => !ids.has(tx.id));
+          });
+        }
+      }
+      setSfCleanResult(deleted);
+    } finally {
+      setSfCleaning(false);
+    }
   }
 
   return (
@@ -408,6 +439,23 @@ export default function Import() {
                       );
                     })}
                   </div>
+                  {sfExcludedIds.size > 0 && (
+                    <div className="mt-3 flex items-center gap-3">
+                      <button
+                        onClick={cleanExcludedAccountTxns}
+                        disabled={sfCleaning}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 disabled:opacity-50 rounded-lg text-xs font-medium transition-colors"
+                      >
+                        <Trash2 size={12} className={sfCleaning ? 'animate-pulse' : ''} />
+                        {sfCleaning ? 'Deleting…' : 'Delete transactions from excluded accounts'}
+                      </button>
+                      {sfCleanResult !== null && (
+                        <span className="text-xs text-emerald-400 flex items-center gap-1">
+                          <Check size={12} /> {sfCleanResult === 0 ? 'None found' : `${sfCleanResult} deleted`}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-yellow-400 text-sm flex items-center gap-2">
