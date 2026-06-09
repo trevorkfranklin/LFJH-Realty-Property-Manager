@@ -139,6 +139,32 @@ export default function Import() {
   const isValidDate = (str) => /^\d{4}-\d{2}-\d{2}$/.test((str ?? '').trim());
 
   const [cleanupResult, setCleanupResult] = useState(null);
+  const [sfSources, setSfSources] = useState(null);
+  const [sfSourcesLoading, setSfSourcesLoading] = useState(false);
+  const [sfSourceDeleting, setSfSourceDeleting] = useState(null);
+
+  async function loadSfSources() {
+    setSfSourcesLoading(true);
+    const { data } = await supabase.from('transactions').select('notes').like('notes', 'SimpleFIN — %');
+    const counts = {};
+    for (const row of data || []) {
+      counts[row.notes] = (counts[row.notes] || 0) + 1;
+    }
+    setSfSources(Object.entries(counts).map(([notes, count]) => ({ notes, count })).sort((a, b) => a.notes.localeCompare(b.notes)));
+    setSfSourcesLoading(false);
+  }
+
+  async function deleteSfSource(notes) {
+    setSfSourceDeleting(notes);
+    const { data: rows } = await supabase.from('transactions').select('id').eq('notes', notes);
+    if (rows?.length) {
+      await supabase.from('transactions').delete().in('id', rows.map(r => r.id));
+      const ids = new Set(rows.map(r => r.id));
+      setTransactionsRaw(prev => prev.filter(tx => !ids.has(tx.id)));
+    }
+    setSfSources(prev => prev.filter(s => s.notes !== notes));
+    setSfSourceDeleting(null);
+  }
   const cleanup = () => {
     const seen = new Set();
     const toDelete = [];
@@ -698,6 +724,42 @@ export default function Import() {
               <Check size={14} /> {cleanupResult === 0 ? 'No duplicates found. All IDs reassigned.' : `Removed ${cleanupResult} duplicate${cleanupResult !== 1 ? 's' : ''} and reassigned all IDs.`}
             </p>
           )}
+          <div className="p-4 bg-navy-800 border border-navy-700 rounded-xl mt-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-white">Bank account transaction sources</p>
+                <p className="text-xs text-slate-500 mt-0.5">View and delete all transactions from a specific SimpleFIN account</p>
+              </div>
+              <button
+                onClick={loadSfSources}
+                disabled={sfSourcesLoading}
+                className="px-4 py-2 bg-navy-700 hover:bg-navy-600 text-slate-300 hover:text-white rounded-lg text-sm font-medium shrink-0 ml-4 transition-colors disabled:opacity-50"
+              >
+                {sfSourcesLoading ? 'Loading…' : 'Load'}
+              </button>
+            </div>
+            {sfSources !== null && (
+              <div className="mt-3 space-y-1.5">
+                {sfSources.length === 0 && <p className="text-xs text-slate-500">No SimpleFIN transactions found.</p>}
+                {sfSources.map(s => (
+                  <div key={s.notes} className="flex items-center justify-between px-3 py-2 bg-navy-900 rounded-lg border border-navy-700">
+                    <span className="text-sm text-slate-300 truncate">{s.notes.replace('SimpleFIN — ', '')}</span>
+                    <div className="flex items-center gap-3 shrink-0 ml-3">
+                      <span className="text-xs text-slate-500">{s.count} tx</span>
+                      <button
+                        onClick={() => deleteSfSource(s.notes)}
+                        disabled={sfSourceDeleting === s.notes}
+                        className="flex items-center gap-1 px-2 py-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 size={11} />
+                        {sfSourceDeleting === s.notes ? 'Deleting…' : 'Delete all'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
