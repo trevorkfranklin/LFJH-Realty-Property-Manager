@@ -34,7 +34,18 @@ export default async function handler(req, res) {
     if (!sfRes.ok) throw new Error(`SimpleFIN API error: ${sfRes.status} ${await sfRes.text()}`);
     const sfData = await sfRes.json();
 
-    const chaseAccounts = (sfData.accounts || []).filter(a => a.org?.name?.toLowerCase().includes('chase'));
+    const excludedIdsRes = await fetch(`${SB_URL}/rest/v1/settings?key=eq.simplefin_excluded_ids&select=value`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+    });
+    const excludedIdsData = excludedIdsRes.ok ? await excludedIdsRes.json() : [];
+    let excludedIds = new Set();
+    try { excludedIds = new Set(JSON.parse(excludedIdsData[0]?.value || '[]')); } catch {}
+
+    const EXCLUDED_ACCOUNT_SUFFIXES = ['6663', '5100', '9533'];
+    const chaseAccounts = (sfData.accounts || [])
+      .filter(a => a.org?.name?.toLowerCase().includes('chase'))
+      .filter(a => !EXCLUDED_ACCOUNT_SUFFIXES.some(suffix => (a.name || a.id || '').includes(suffix)))
+      .filter(a => !excludedIds.has(a.id));
 
     const fetched = chaseAccounts.flatMap(acct =>
       (acct.transactions || []).map(tx => {
