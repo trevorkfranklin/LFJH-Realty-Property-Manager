@@ -46,7 +46,7 @@ export default function Layout({ children }) {
           <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={() => setMobileNavOpen(false)} />
         )}
         <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
           <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-navy-900 border-b border-navy-700 flex-shrink-0">
             <button onClick={() => setMobileNavOpen(true)} className="text-slate-400 hover:text-white">
               <Menu size={22} />
@@ -55,7 +55,7 @@ export default function Layout({ children }) {
               <img src="/logo.png" alt="LT²D Realty, LLC" className="h-8 w-auto object-contain" />
             </div>
           </div>
-          <main className="flex-1 overflow-y-auto bg-slate-900">{children}</main>
+          <main className="flex-1 overflow-y-auto bg-slate-900 min-h-0">{children}</main>
         </div>
       </div>
       <SyncBanner />
