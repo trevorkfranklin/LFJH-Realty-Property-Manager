@@ -23,8 +23,12 @@ export default async function handler(req, res) {
     const auth = Buffer.from(`${u.username}:${u.password}`).toString('base64');
     const base = `${u.protocol}//${u.host}${u.pathname}`;
 
+    // SimpleFIN's bank feed can lag more than a day or two behind actual posting
+    // dates, so a narrow window can miss a transaction on the night it posts and
+    // then age it out of range on every subsequent run. Dedup below is keyed on
+    // sf_tx_id / date+amount, so re-checking a wider window nightly is safe.
     const since = new Date();
-    since.setDate(since.getDate() - 3);
+    since.setDate(since.getDate() - 14);
     const startTs = Math.floor(since.getTime() / 1000);
     const sinceDate = since.toISOString().slice(0, 10);
 
