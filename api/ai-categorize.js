@@ -1,12 +1,15 @@
-export const config = { runtime: 'edge' };
+// Node runtime (not edge) so a large batch has real headroom to finish —
+// edge functions are capped at ~25s and this prompt can run long with a full
+// examples/uncategorized batch.
+export const config = { maxDuration: 60 };
 
-export default async function handler(req) {
-  if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
   const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) return new Response('OpenRouter API key not configured', { status: 500 });
+  if (!apiKey) return res.status(500).json({ error: 'OpenRouter API key not configured' });
 
-  const { uncategorized, examples, properties, owners, categories } = await req.json();
+  const { uncategorized, examples, properties, owners, categories } = req.body;
 
   const propLines   = properties.map(p => `  id="${p.id}" name="${p.name}"`).join('\n');
   const ownerLines  = owners.map(o => `  id="${o.id}" name="${o.name}"`).join('\n');
@@ -78,13 +81,13 @@ Respond ONLY with valid JSON matching this exact schema — no markdown, no expl
   ]
 }`;
 
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://lfjh-realty-property-manager.vercel.app',
-      'X-Title': 'LFJH Realty Property Manager',
+      'HTTP-Referer': 'https://lt2d-realty-property-manager.vercel.app',
+      'X-Title': 'LT2D Realty Property Manager',
     },
     body: JSON.stringify({
       model: 'deepseek/deepseek-v4-flash',
@@ -97,12 +100,12 @@ Respond ONLY with valid JSON matching this exact schema — no markdown, no expl
     }),
   });
 
-  if (!res.ok) {
-    const err = await res.text();
-    return new Response(err, { status: res.status });
+  if (!orRes.ok) {
+    const err = await orRes.text();
+    return res.status(orRes.status).send(err);
   }
 
-  const data = await res.json();
+  const data = await orRes.json();
   const content = data.choices?.[0]?.message?.content || '{"suggestions":[]}';
-  return new Response(content, { status: 200, headers: { 'Content-Type': 'application/json' } });
+  return res.status(200).setHeader('Content-Type', 'application/json').send(content);
 }
